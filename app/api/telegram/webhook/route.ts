@@ -12,15 +12,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const userId = update.message.from.id;
       const chatId = update.message.chat.id;
 
-      // Process command in background (don't await to respond quickly)
-      handleCommand(chatId, userId, text).catch(console.error);
+      // Must await - serverless functions terminate when response is sent
+      await handleCommand(chatId, userId, text);
     }
 
-    // Always return 200 to Telegram
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Webhook error:", error);
-    return NextResponse.json({ ok: true }); // Still return 200 to prevent retries
+    return NextResponse.json({ ok: true });
   }
 }
 
