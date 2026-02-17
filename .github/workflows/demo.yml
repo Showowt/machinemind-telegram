@@ -26,33 +26,41 @@ jobs:
               "parse_mode": "HTML"
             }'
 
-      - name: Trigger Vercel Preview
-        id: deploy
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ inputs.project }}
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel
+
+      - name: Pull Vercel Project
         run: |
-          # Trigger deployment via Vercel API
-          RESPONSE=$(curl -s -X POST "https://api.vercel.com/v13/deployments" \
-            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "name": "${{ inputs.project }}",
-              "target": "preview",
-              "gitSource": {
-                "type": "github",
-                "repo": "Showowt/${{ inputs.project }}",
-                "ref": "main"
-              }
-            }')
+          vercel pull --yes --token=${{ secrets.VERCEL_TOKEN }} 2>/dev/null || true
 
-          URL=$(echo $RESPONSE | jq -r '.url // empty')
-          ID=$(echo $RESPONSE | jq -r '.id // empty')
+      - name: Build Project
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        id: build
+        continue-on-error: true
 
+      - name: Deploy Preview
+        id: deploy
+        if: steps.build.outcome == 'success'
+        run: |
+          URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | grep -oE 'https://[^ ]+\.vercel\.app' | head -1)
+          echo "url=$URL" >> $GITHUB_OUTPUT
           if [ -n "$URL" ]; then
-            echo "url=$URL" >> $GITHUB_OUTPUT
             echo "success=true" >> $GITHUB_OUTPUT
           else
             echo "success=false" >> $GITHUB_OUTPUT
-            echo "error=$(echo $RESPONSE | jq -r '.error.message // "Unknown error"')" >> $GITHUB_OUTPUT
           fi
+        continue-on-error: true
 
       - name: Notify Success
         if: steps.deploy.outputs.success == 'true'
@@ -61,17 +69,17 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "chat_id": "${{ inputs.chat_id }}",
-              "text": "🎬 <b>Demo Ready!</b>\n\nProject: <code>${{ inputs.project }}</code>\n\n🔗 Preview: https://${{ steps.deploy.outputs.url }}\n\n⏱️ Link expires in 24 hours",
+              "text": "🎬 <b>Demo Ready!</b>\n\nProject: <code>${{ inputs.project }}</code>\n\n🔗 Preview: ${{ steps.deploy.outputs.url }}\n\n⏱️ This is a preview deployment (not production)",
               "parse_mode": "HTML"
             }'
 
       - name: Notify Failure
-        if: steps.deploy.outputs.success == 'false'
+        if: steps.build.outcome == 'failure' || steps.deploy.outputs.success != 'true'
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -H "Content-Type: application/json" \
             -d '{
               "chat_id": "${{ inputs.chat_id }}",
-              "text": "❌ <b>Demo Deploy Failed</b>\n\nProject: <code>${{ inputs.project }}</code>\nError: ${{ steps.deploy.outputs.error }}",
+              "text": "❌ <b>Demo Deploy Failed</b>\n\nProject: <code>${{ inputs.project }}</code>\n\nBuild: ${{ steps.build.outcome }}\n\n🔗 <a href=\"https://github.com/Showowt/${{ inputs.project }}/actions\">View Logs</a>",
               "parse_mode": "HTML"
             }'
