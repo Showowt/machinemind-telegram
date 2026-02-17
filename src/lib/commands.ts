@@ -23,27 +23,27 @@ const commands: Record<string, CommandHandler> = {
     await sendMessage(
       chatId,
       `🚀 <b>MachineMind Command Center</b>\n\n` +
-        `<b>🔧 Build Commands:</b>\n` +
+        `<b>🏗️ Create:</b>\n` +
+        `<code>/new [business] [sector]</code> — Create full project\n\n` +
+        `<b>🔧 Build:</b>\n` +
         `<code>/genesis [project]</code> — Full autonomous build\n` +
         `<code>/audit [project]</code> — Security + quality scan\n` +
         `<code>/demo [project]</code> — Create preview deploy\n` +
         `<code>/component [name] [project]</code> — Generate component\n` +
         `<code>/sofia [project]</code> — Sofia deploy swarm\n\n` +
-        `<b>🚀 Deployment:</b>\n` +
+        `<b>🚀 Deploy:</b>\n` +
         `<code>/sites</code> — List all projects\n` +
         `<code>/status [project]</code> — Deployment status\n` +
         `<code>/deploy [project]</code> — Deploy to production\n` +
         `<code>/logs [project]</code> — Build logs\n` +
         `<code>/errors [project]</code> — Runtime errors\n` +
-        `<code>/rollback [project]</code> — Rollback to previous\n` +
-        `<code>/cancel [project]</code> — Cancel active build\n\n` +
-        `<b>📊 Project Info:</b>\n` +
-        `<code>/domains [project]</code> — List domains\n` +
-        `<code>/env [project]</code> — Environment variables\n\n` +
-        `<b>⚡ Utility:</b>\n` +
-        `<code>/ping</code> — Health check\n` +
-        `<code>/help</code> — Show this message\n\n` +
-        `💡 Example: <code>/genesis simmer-down</code>`,
+        `<code>/rollback [project]</code> — Rollback\n` +
+        `<code>/cancel [project]</code> — Cancel build\n\n` +
+        `<b>📊 Info:</b>\n` +
+        `<code>/domains [project]</code> — Domains\n` +
+        `<code>/env [project]</code> — Env vars\n` +
+        `<code>/ping</code> — Health check\n\n` +
+        `💡 <code>/new "Yacht Club" hospitality</code>`,
     );
   },
 
@@ -61,6 +61,79 @@ const commands: Record<string, CommandHandler> = {
         `🔗 GitHub Actions: Ready\n` +
         `🕐 Server Time: ${new Date().toISOString()}`,
     );
+  },
+
+  // ==================== CREATE COMMANDS ====================
+
+  new: async (chatId, args) => {
+    if (args.length < 2) {
+      await sendMessage(
+        chatId,
+        `🏗️ <b>New Project Generator</b>\n\n` +
+          `Creates a complete project from scratch.\n\n` +
+          `<b>Usage:</b>\n` +
+          `<code>/new [business-name] [sector]</code>\n\n` +
+          `<b>Sectors:</b>\n` +
+          `• hospitality\n` +
+          `• restaurant\n` +
+          `• nightclub\n` +
+          `• yacht\n` +
+          `• villa\n` +
+          `• tour\n` +
+          `• hotel\n` +
+          `• spa\n\n` +
+          `<b>Example:</b>\n` +
+          `<code>/new "Cartagena Yacht Club" yacht</code>\n` +
+          `<code>/new "Sofia Lounge" nightclub</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+
+    // Parse args - handle quoted business name
+    let businessName: string;
+    let sector: string;
+
+    const fullText = args.join(" ");
+    const quotedMatch = fullText.match(/["']([^"']+)["']\s+(\w+)/);
+
+    if (quotedMatch) {
+      businessName = quotedMatch[1];
+      sector = quotedMatch[2];
+    } else {
+      // No quotes - last word is sector, rest is business name
+      sector = args[args.length - 1];
+      businessName = args.slice(0, -1).join(" ");
+    }
+
+    const success = await triggerWorkflow(
+      GITHUB_OWNER,
+      BOT_REPO,
+      "new-project.yml",
+      {
+        business_name: businessName,
+        sector: sector,
+        chat_id: String(chatId),
+      },
+    );
+
+    if (success) {
+      await sendMessage(
+        chatId,
+        `🏗️ <b>Project Creation Started</b>\n\n` +
+          `🏢 Business: <code>${businessName}</code>\n` +
+          `🎯 Sector: <code>${sector}</code>\n\n` +
+          `⏱️ ETA: 2-3 minutes\n\n` +
+          `You'll receive the GitHub repo + live URL when ready.`,
+      );
+    } else {
+      await sendMessage(
+        chatId,
+        `❌ Failed to start project creation.\n\n` +
+          `Make sure GITHUB_TOKEN is configured.`,
+      );
+    }
   },
 
   // ==================== BUILD COMMANDS ====================

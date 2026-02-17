@@ -1,0 +1,375 @@
+name: New Project Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      business_name:
+        description: 'Business name'
+        required: true
+        type: string
+      sector:
+        description: 'Business sector (hospitality, restaurant, nightclub, yacht, villa, tour, etc)'
+        required: true
+        type: string
+      chat_id:
+        description: 'Telegram chat ID'
+        required: true
+        type: string
+
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  notify-start:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "🏗️ <b>Project Generator Activated</b>\n\n🏢 Business: <code>${{ inputs.business_name }}</code>\n🎯 Sector: <code>${{ inputs.sector }}</code>\n\n⚡ Spawning creation swarm:\n• Architect Agent\n• Database Agent\n• Frontend Agent\n• Deploy Agent\n\n⏱️ ETA: 2-3 minutes",
+              "parse_mode": "HTML"
+            }'
+
+  create-project:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_name: ${{ steps.setup.outputs.repo_name }}
+      slug: ${{ steps.setup.outputs.slug }}
+    steps:
+      - name: Setup Project Info
+        id: setup
+        run: |
+          # Convert business name to slug
+          SLUG=$(echo "${{ inputs.business_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+          echo "slug=$SLUG" >> $GITHUB_OUTPUT
+          echo "repo_name=$SLUG" >> $GITHUB_OUTPUT
+
+      - name: Create Repository
+        run: |
+          curl -s -X POST "https://api.github.com/user/repos" \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "${{ steps.setup.outputs.repo_name }}",
+              "description": "${{ inputs.business_name }} - ${{ inputs.sector }} | Built by MachineMind",
+              "private": false,
+              "auto_init": true
+            }'
+
+      - name: Wait for repo
+        run: sleep 5
+
+      - name: Checkout new repo
+        uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ steps.setup.outputs.repo_name }}
+          token: ${{ secrets.GH_PAT }}
+          path: project
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate Project with Claude
+        working-directory: project
+        run: |
+          BUSINESS="${{ inputs.business_name }}"
+          SECTOR="${{ inputs.sector }}"
+          SLUG="${{ steps.setup.outputs.slug }}"
+
+          # Create Next.js structure
+          mkdir -p app components lib public
+
+          # package.json
+          cat > package.json << EOF
+          {
+            "name": "$SLUG",
+            "version": "1.0.0",
+            "private": true,
+            "scripts": {
+              "dev": "next dev",
+              "build": "next build",
+              "start": "next start",
+              "lint": "next lint"
+            },
+            "dependencies": {
+              "next": "^14.2.0",
+              "react": "^18.3.0",
+              "react-dom": "^18.3.0",
+              "@supabase/supabase-js": "^2.45.0"
+            },
+            "devDependencies": {
+              "typescript": "^5.5.0",
+              "@types/node": "^20.14.0",
+              "@types/react": "^18.3.0",
+              "@types/react-dom": "^18.3.0",
+              "tailwindcss": "^3.4.0",
+              "postcss": "^8.4.0",
+              "autoprefixer": "^10.4.0"
+            }
+          }
+          EOF
+
+          # tsconfig.json
+          cat > tsconfig.json << 'EOF'
+          {
+            "compilerOptions": {
+              "target": "ES2017",
+              "lib": ["dom", "dom.iterable", "esnext"],
+              "allowJs": true,
+              "skipLibCheck": true,
+              "strict": true,
+              "noEmit": true,
+              "esModuleInterop": true,
+              "module": "esnext",
+              "moduleResolution": "bundler",
+              "resolveJsonModule": true,
+              "isolatedModules": true,
+              "jsx": "preserve",
+              "incremental": true,
+              "plugins": [{ "name": "next" }],
+              "paths": { "@/*": ["./*"] }
+            },
+            "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+            "exclude": ["node_modules"]
+          }
+          EOF
+
+          # tailwind.config.js
+          cat > tailwind.config.js << 'EOF'
+          /** @type {import('tailwindcss').Config} */
+          module.exports = {
+            content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+            theme: {
+              extend: {
+                colors: {
+                  primary: "#d4af37",
+                  dark: "#0f0f1a",
+                  darker: "#0a0a12",
+                }
+              }
+            },
+            plugins: [],
+          };
+          EOF
+
+          # postcss.config.js
+          cat > postcss.config.js << 'EOF'
+          module.exports = {
+            plugins: {
+              tailwindcss: {},
+              autoprefixer: {},
+            },
+          };
+          EOF
+
+          # next.config.js
+          cat > next.config.js << 'EOF'
+          /** @type {import('next').NextConfig} */
+          const nextConfig = {};
+          module.exports = nextConfig;
+          EOF
+
+          # .env.example
+          cat > .env.example << 'EOF'
+          NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+          SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+          EOF
+
+          # .gitignore
+          cat > .gitignore << 'EOF'
+          node_modules/
+          .next/
+          .env
+          .env.local
+          .vercel
+          EOF
+
+          # app/globals.css
+          cat > app/globals.css << 'EOF'
+          @tailwind base;
+          @tailwind components;
+          @tailwind utilities;
+
+          body {
+            background-color: #0f0f1a;
+            color: #ffffff;
+          }
+          EOF
+
+          # app/layout.tsx
+          cat > app/layout.tsx << EOF
+          import type { Metadata } from "next";
+          import "./globals.css";
+
+          export const metadata: Metadata = {
+            title: "$BUSINESS",
+            description: "$BUSINESS - Premium $SECTOR experience",
+          };
+
+          export default function RootLayout({
+            children,
+          }: {
+            children: React.ReactNode;
+          }) {
+            return (
+              <html lang="en">
+                <body>{children}</body>
+              </html>
+            );
+          }
+          EOF
+
+          # app/page.tsx - Dynamic based on sector
+          cat > app/page.tsx << EOF
+          export default function Home() {
+            return (
+              <main className="min-h-screen bg-dark">
+                {/* Hero Section */}
+                <section className="relative h-screen flex items-center justify-center">
+                  <div className="text-center px-4">
+                    <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white">
+                      $BUSINESS
+                    </h1>
+                    <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-2xl mx-auto">
+                      Premium $SECTOR Experience
+                    </p>
+                    <div className="flex gap-4 justify-center">
+                      <a
+                        href="#contact"
+                        className="px-8 py-4 bg-primary text-dark font-semibold hover:bg-primary/90 transition"
+                      >
+                        Book Now
+                      </a>
+                      <a
+                        href="#services"
+                        className="px-8 py-4 border border-primary text-primary hover:bg-primary/10 transition"
+                      >
+                        Explore
+                      </a>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Services Section */}
+                <section id="services" className="py-20 px-4 bg-darker">
+                  <div className="max-w-6xl mx-auto">
+                    <h2 className="text-4xl font-bold text-center mb-12 text-primary">
+                      Our Services
+                    </h2>
+                    <div className="grid md:grid-cols-3 gap-8">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="p-6 bg-dark border border-gray-800">
+                          <h3 className="text-xl font-semibold mb-4">Service {i}</h3>
+                          <p className="text-gray-400">
+                            Premium service description goes here.
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                {/* Contact Section */}
+                <section id="contact" className="py-20 px-4">
+                  <div className="max-w-2xl mx-auto text-center">
+                    <h2 className="text-4xl font-bold mb-8 text-primary">
+                      Contact Us
+                    </h2>
+                    <p className="text-gray-300 mb-8">
+                      Ready to experience $BUSINESS? Get in touch.
+                    </p>
+                    <a
+                      href="https://wa.me/573001234567"
+                      className="inline-block px-8 py-4 bg-green-600 text-white font-semibold hover:bg-green-700 transition"
+                    >
+                      WhatsApp Us
+                    </a>
+                  </div>
+                </section>
+
+                {/* Footer */}
+                <footer className="py-8 px-4 border-t border-gray-800">
+                  <div className="max-w-6xl mx-auto text-center text-gray-500">
+                    <p>© 2024 $BUSINESS. All rights reserved.</p>
+                    <p className="text-sm mt-2">Powered by MachineMind</p>
+                  </div>
+                </footer>
+              </main>
+            );
+          }
+          EOF
+
+          # lib/supabase.ts
+          cat > lib/supabase.ts << 'EOF'
+          import { createClient } from "@supabase/supabase-js";
+
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+          export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          EOF
+
+      - name: Commit Project
+        working-directory: project
+        run: |
+          git config user.name "MachineMind Bot"
+          git config user.email "bot@machinemind.ai"
+          git add -A
+          git commit -m "🚀 Initial project: ${{ inputs.business_name }} (${{ inputs.sector }})"
+          git push
+
+  deploy:
+    needs: create-project
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ needs.create-project.outputs.repo_name }}
+          token: ${{ secrets.GH_PAT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - run: npm i -g vercel
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes 2>&1 | grep -oE 'https://[^ ]+\.vercel\.app' | tail -1)
+          echo "url=$URL" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+  report:
+    needs: [create-project, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Final Report
+        run: |
+          REPO="${{ needs.create-project.outputs.repo_name }}"
+          URL="${{ needs.deploy.outputs.url }}"
+
+          if [ -n "$URL" ]; then
+            STATUS="✅ LIVE"
+          else
+            STATUS="⚠️ Deploy pending"
+            URL="Check Vercel dashboard"
+          fi
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"chat_id\": \"${{ inputs.chat_id }}\",
+              \"text\": \"🏗️ <b>Project Created: $STATUS</b>\n\n🏢 <b>${{ inputs.business_name }}</b>\n🎯 Sector: ${{ inputs.sector }}\n\n<b>Resources:</b>\n📁 Repo: <a href=\\\"https://github.com/Showowt/$REPO\\\">github.com/Showowt/$REPO</a>\n🌐 Live: $URL\n\n<b>Stack:</b>\n• Next.js 14 + TypeScript\n• Tailwind CSS\n• Supabase ready\n• Vercel deployed\n\n<b>Next steps:</b>\n1. <code>/audit $REPO</code>\n2. Add Supabase keys\n3. Customize content\",
+              \"parse_mode\": \"HTML\"
+            }"
