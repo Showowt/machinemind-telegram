@@ -12,6 +12,11 @@ import {
   cancelDeployment,
 } from "./vercel";
 import { triggerWorkflow } from "./github";
+import {
+  researchBusiness,
+  formatResearchForTelegram,
+  researchToBuildConfig,
+} from "./research";
 
 const GITHUB_OWNER = "Showowt";
 const BOT_REPO = "machinemind-telegram";
@@ -57,6 +62,8 @@ const commands: Record<string, CommandHandler> = {
     await sendMessage(
       chatId,
       `🚀 <b>MachineMind Command Center</b>\n\n` +
+        `<b>🔍 Research:</b>\n` +
+        `<code>/research [business]</code> — Scrape business intel\n\n` +
         `<b>🏗️ Create:</b>\n` +
         `<code>/new [business] [sector]</code> — Create full project\n\n` +
         `<b>🔧 Build:</b>\n` +
@@ -77,7 +84,7 @@ const commands: Record<string, CommandHandler> = {
         `<code>/domains [project]</code> — Domains\n` +
         `<code>/env [project]</code> — Env vars\n` +
         `<code>/ping</code> — Health check\n\n` +
-        `💡 <code>/new "Yacht Club" hospitality</code>`,
+        `💡 <code>/research "Alquimico" nightclub</code>`,
     );
   },
 
@@ -95,6 +102,74 @@ const commands: Record<string, CommandHandler> = {
         `🔗 GitHub Actions: Ready\n` +
         `🕐 Server Time: ${new Date().toISOString()}`,
     );
+  },
+
+  // ==================== RESEARCH COMMANDS ====================
+
+  research: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🔍 <b>Research Agent</b>\n\n` +
+          `Scrapes business info from the web before builds.\n\n` +
+          `<b>Usage:</b>\n` +
+          `<code>/research [business-name]</code>\n` +
+          `<code>/research [business-name] [sector]</code>\n` +
+          `<code>/research [business-name] [sector] [city]</code>\n\n` +
+          `<b>Examples:</b>\n` +
+          `<code>/research "Casa San Agustin"</code>\n` +
+          `<code>/research "Alquimico" nightclub Cartagena</code>\n` +
+          `<code>/research "La Cevicheria" restaurant</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    await sendMessage(chatId, `🔍 Researching business...`);
+
+    // Parse args - handle quoted business name
+    const fullText = args.join(" ");
+    let businessName: string;
+    let sector: string | undefined;
+    let location: string | undefined;
+
+    const quotedMatch = fullText.match(/["']([^"']+)["']\s*(.*)/);
+    if (quotedMatch) {
+      businessName = quotedMatch[1];
+      const remaining = quotedMatch[2].trim().split(/\s+/);
+      sector = remaining[0] || undefined;
+      location = remaining.slice(1).join(" ") || undefined;
+    } else {
+      // No quotes - first word is business, rest are sector/location
+      const words = fullText.split(/\s+/);
+      businessName = words[0];
+      sector = words[1] || undefined;
+      location = words.slice(2).join(" ") || undefined;
+    }
+
+    try {
+      const research = await researchBusiness(businessName, sector, location);
+      const formattedMsg = formatResearchForTelegram(research);
+      await sendMessage(chatId, formattedMsg);
+
+      // Also show build config preview
+      const config = researchToBuildConfig(research);
+      const configPreview = Object.entries(config)
+        .slice(0, 8)
+        .map(([k, v]) => `${k}: ${v.slice(0, 30)}${v.length > 30 ? "..." : ""}`)
+        .join("\n");
+
+      await sendMessage(
+        chatId,
+        `\n📦 <b>Build Config Preview:</b>\n<pre>${configPreview}</pre>\n\n` +
+          `💡 Use <code>/new "${businessName}" ${sector || "hospitality"}</code> to create project with this data.`,
+      );
+    } catch (error) {
+      await sendMessage(
+        chatId,
+        `❌ Research failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
   },
 
   // ==================== CREATE COMMANDS ====================
