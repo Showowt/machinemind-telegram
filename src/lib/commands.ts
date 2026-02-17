@@ -22,6 +22,12 @@ import {
   formatResearchForTelegram,
   researchToBuildConfig,
 } from "./research";
+import {
+  generateBuildConfig,
+  formatBuildConfigForTelegram,
+  generateBuildPrompt,
+  SECTOR_TEMPLATES,
+} from "./genesis-engine";
 
 const GITHUB_OWNER = "Showowt";
 const BOT_REPO = "machinemind-telegram";
@@ -67,14 +73,15 @@ const commands: Record<string, CommandHandler> = {
     await sendMessage(
       chatId,
       `🚀 <b>MachineMind Command Center</b>\n\n` +
-        `<b>🔍 Research:</b>\n` +
+        `<b>⚡ GENESIS ENGINE:</b>\n` +
+        `<code>/build [business] [sector]</code> — Full masterpiece build\n` +
         `<code>/research [business]</code> — Scrape business intel\n\n` +
         `<b>🏗️ Create:</b>\n` +
-        `<code>/new [business] [sector]</code> — Create full project\n\n` +
+        `<code>/new [business] [sector]</code> — Create project\n\n` +
         `<b>📦 GitHub:</b>\n` +
         `<code>/repos</code> — List GitHub repos\n\n` +
-        `<b>🔧 Build:</b>\n` +
-        `<code>/genesis [project]</code> — Full autonomous build\n` +
+        `<b>🔧 CI/CD:</b>\n` +
+        `<code>/genesis [project]</code> — Run build checks\n` +
         `<code>/audit [project]</code> — Security + quality scan\n` +
         `<code>/demo [project]</code> — Create preview deploy\n` +
         `<code>/component [name] [project]</code> — Generate component\n` +
@@ -169,12 +176,115 @@ const commands: Record<string, CommandHandler> = {
       await sendMessage(
         chatId,
         `\n📦 <b>Build Config Preview:</b>\n<pre>${configPreview}</pre>\n\n` +
-          `💡 Use <code>/new "${businessName}" ${sector || "hospitality"}</code> to create project with this data.`,
+          `💡 Use <code>/build "${businessName}" ${sector || "hospitality"}</code> to create a masterpiece.`,
       );
     } catch (error) {
       await sendMessage(
         chatId,
         `❌ Research failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  },
+
+  build: async (chatId, args) => {
+    if (args.length === 0) {
+      const sectors = Object.keys(SECTOR_TEMPLATES).join(", ");
+      await sendMessage(
+        chatId,
+        `⚡ <b>GENESIS BUILD ENGINE</b>\n\n` +
+          `Powered by PROMETHEUS v2 + APEX v6 + BCB-OS v2\n\n` +
+          `Creates masterpiece websites with:\n` +
+          `• Research Agent (scrapes business intel)\n` +
+          `• APEX 4-Layer Architecture\n` +
+          `• Blue Ocean competitive advantage\n` +
+          `• Sector-specific templates\n` +
+          `• ZDBS quality standards\n\n` +
+          `<b>Usage:</b>\n` +
+          `<code>/build [business-name] [sector]</code>\n\n` +
+          `<b>Sectors:</b> ${sectors}\n\n` +
+          `<b>Example:</b>\n` +
+          `<code>/build "Casa San Agustin" hotel</code>\n` +
+          `<code>/build "Alquimico" nightclub</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+
+    // Parse args
+    const fullText = args.join(" ");
+    let businessName: string;
+    let sector: string;
+    let location: string | undefined;
+
+    const quotedMatch = fullText.match(/["']([^"']+)["']\s*(.*)/);
+    if (quotedMatch) {
+      businessName = quotedMatch[1];
+      const remaining = quotedMatch[2].trim().split(/\s+/);
+      sector = remaining[0] || "hospitality";
+      location = remaining.slice(1).join(" ") || undefined;
+    } else {
+      const words = fullText.split(/\s+/);
+      sector = words[words.length - 1];
+      businessName = words.slice(0, -1).join(" ");
+      if (!businessName) {
+        businessName = sector;
+        sector = "hospitality";
+      }
+    }
+
+    // Validate sector
+    if (!SECTOR_TEMPLATES[sector]) {
+      const sectors = Object.keys(SECTOR_TEMPLATES).join(", ");
+      await sendMessage(
+        chatId,
+        `❌ Unknown sector: <code>${sector}</code>\n\n` +
+          `Available: ${sectors}`,
+      );
+      return;
+    }
+
+    await sendMessage(
+      chatId,
+      `⚡ <b>GENESIS ENGINE ACTIVATED</b>\n\n` +
+        `🔍 Phase 1: Research Agent scanning...\n` +
+        `📊 Business: ${businessName}\n` +
+        `🏷️ Sector: ${sector}`,
+    );
+
+    try {
+      // Phase 1: Research
+      const research = await researchBusiness(businessName, sector, location);
+
+      await sendMessage(
+        chatId,
+        `✅ Research complete\n\n` + `🏗️ Phase 2: Generating build config...`,
+      );
+
+      // Phase 2: Generate build config using Genesis Engine
+      const buildConfig = generateBuildConfig(research, String(chatId));
+
+      // Display the full config
+      const configDisplay = formatBuildConfigForTelegram(buildConfig);
+      await sendMessage(chatId, configDisplay);
+
+      // Phase 3: Generate the build prompt (for reference)
+      const buildPrompt = generateBuildPrompt(buildConfig);
+
+      await sendMessage(
+        chatId,
+        `\n🚀 <b>Ready to Build</b>\n\n` +
+          `This will create:\n` +
+          `• ${buildConfig.architecture.pages.length} pages\n` +
+          `• ${buildConfig.architecture.components.length} components\n` +
+          `• ${buildConfig.architecture.features.length} features\n\n` +
+          `Blue Ocean: ${buildConfig.blueOcean.vector}\n\n` +
+          `<b>Next:</b> <code>/new "${businessName}" ${sector}</code> to launch the build`,
+      );
+    } catch (error) {
+      await sendMessage(
+        chatId,
+        `❌ Build config failed: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   },
