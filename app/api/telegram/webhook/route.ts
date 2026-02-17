@@ -3,17 +3,22 @@ import { handleCommand } from "@/lib/commands";
 import type { TelegramUpdate } from "@/lib/telegram";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  console.log("Webhook POST received");
+
   try {
     const update: TelegramUpdate = await request.json();
+    console.log("Update received:", JSON.stringify(update));
 
-    // Only handle text messages
     if (update.message?.text && update.message.from && update.message.chat) {
       const { text } = update.message;
       const userId = update.message.from.id;
       const chatId = update.message.chat.id;
 
-      // Must await - serverless functions terminate when response is sent
+      console.log(
+        `Processing: chatId=${chatId}, userId=${userId}, text=${text}`,
+      );
       await handleCommand(chatId, userId, text);
+      console.log("Command handled successfully");
     }
 
     return NextResponse.json({ ok: true });

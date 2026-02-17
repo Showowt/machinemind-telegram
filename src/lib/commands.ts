@@ -215,14 +215,24 @@ export async function handleCommand(
   userId: number,
   text: string,
 ): Promise<void> {
+  console.log(
+    `handleCommand called: chatId=${chatId}, userId=${userId}, text=${text}`,
+  );
+
   // Security: Check if user is authorized
   const authorizedUsers =
     process.env.AUTHORIZED_TELEGRAM_IDS?.split(",").map(Number) || [];
 
+  console.log(
+    `Authorized users: ${JSON.stringify(authorizedUsers)}, checking userId: ${userId}`,
+  );
+
   if (authorizedUsers.length > 0 && !authorizedUsers.includes(userId)) {
+    console.log("User not authorized");
     await sendMessage(chatId, "⛔ Unauthorized. This bot is private.");
     return;
   }
+  console.log("User authorized, proceeding");
 
   // Parse command
   if (!text.startsWith("/")) {
