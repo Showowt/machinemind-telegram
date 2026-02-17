@@ -25,10 +25,10 @@ async function vercelFetch<T>(
   endpoint: string,
   options?: RequestInit,
 ): Promise<T> {
-  const token = process.env.VERCEL_TOKEN;
+  const token = process.env.VERCEL_API_TOKEN;
   const teamId = process.env.VERCEL_TEAM_ID;
 
-  if (!token) throw new Error("VERCEL_TOKEN not set");
+  if (!token) throw new Error("VERCEL_API_TOKEN not set");
 
   const separator = endpoint.includes("?") ? "&" : "?";
   const url = `${VERCEL_API}${endpoint}${teamId ? `${separator}teamId=${teamId}` : ""}`;
