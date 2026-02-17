@@ -19,6 +19,22 @@ interface VercelDeployment {
   state: string;
   createdAt: number;
   readyState?: string;
+  meta?: {
+    gitCommitMessage?: string;
+    gitCommitRef?: string;
+  };
+}
+
+interface VercelDomain {
+  name: string;
+  verified: boolean;
+  gitBranch?: string;
+}
+
+interface VercelEnvVar {
+  key: string;
+  target: string[];
+  type: string;
 }
 
 async function vercelFetch<T>(
@@ -90,15 +106,12 @@ export async function getDeployment(
 export async function triggerDeployment(
   projectName: string,
 ): Promise<{ id: string; url: string } | null> {
-  // Get project first
   const project = await getProject(projectName);
   if (!project) return null;
 
-  // Trigger deployment via deploy hook or redeploy latest
   const deployments = await listDeployments(project.id, 1);
   if (deployments.length === 0) return null;
 
-  // Create a new deployment by redeploying the latest
   const latest = deployments[0];
 
   try {
@@ -123,13 +136,78 @@ export async function getDeploymentLogs(
   deploymentId: string,
 ): Promise<string[]> {
   try {
-    const teamId = process.env.VERCEL_TEAM_ID;
-    const teamParam = teamId ? `&teamId=${teamId}` : "";
-    const data = await vercelFetch<{ logs: Array<{ text: string }> }>(
-      `/v2/deployments/${deploymentId}/events?limit=50${teamParam}`,
+    const data = await vercelFetch<{ output: Array<{ text: string }> }>(
+      `/v2/deployments/${deploymentId}/events?limit=100`,
     );
-    return data.logs?.map((l) => l.text) || [];
+    return data.output?.map((l) => l.text).filter(Boolean) || [];
   } catch {
     return [];
+  }
+}
+
+export async function getProjectDomains(
+  projectId: string,
+): Promise<VercelDomain[]> {
+  try {
+    const data = await vercelFetch<{ domains: VercelDomain[] }>(
+      `/v9/projects/${projectId}/domains`,
+    );
+    return data.domains || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getProjectEnvVars(
+  projectId: string,
+): Promise<VercelEnvVar[]> {
+  try {
+    const data = await vercelFetch<{ envs: VercelEnvVar[] }>(
+      `/v9/projects/${projectId}/env`,
+    );
+    return data.envs || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getRuntimeLogs(
+  projectId: string,
+  options?: { level?: string; limit?: number },
+): Promise<Array<{ message: string; timestamp: number; level: string }>> {
+  try {
+    const limit = options?.limit || 20;
+    const levelFilter = options?.level ? `&level=${options.level}` : "";
+    const data = await vercelFetch<{
+      logs: Array<{ message: string; timestamp: number; level: string }>;
+    }>(`/v1/projects/${projectId}/logs?limit=${limit}${levelFilter}`);
+    return data.logs || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function promoteDeployment(
+  deploymentId: string,
+  projectId: string,
+): Promise<boolean> {
+  try {
+    await vercelFetch(`/v10/projects/${projectId}/promote/${deploymentId}`, {
+      method: "POST",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function cancelDeployment(deploymentId: string): Promise<boolean> {
+  try {
+    await vercelFetch(`/v12/deployments/${deploymentId}/cancel`, {
+      method: "PATCH",
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
