@@ -47,6 +47,18 @@ jobs:
         id: setup
         run: |
           SLUG=$(echo "${{ inputs.business_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+
+          # CRITICAL: Blocklist of reserved project names that must NEVER be overwritten
+          RESERVED_NAMES="machinemind-telegram machinemind-landing sofia-brain contentengine moneymachine xclusive-platform"
+
+          for RESERVED in $RESERVED_NAMES; do
+            if [ "$SLUG" = "$RESERVED" ]; then
+              echo "ERROR: '$SLUG' is a reserved project name!"
+              echo "Cannot create project with this name."
+              exit 1
+            fi
+          done
+
           echo "slug=$SLUG" >> $GITHUB_OUTPUT
           echo "repo_name=$SLUG" >> $GITHUB_OUTPUT
 
@@ -777,6 +789,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       url: ${{ steps.deploy.outputs.url }}
+    env:
+      # Explicit project name to prevent domain collision
+      PROJECT_NAME: ${{ needs.create-project.outputs.repo_name }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -791,10 +806,33 @@ jobs:
 
       - run: npm i -g vercel
 
-      - name: Deploy to Vercel
+      - name: Create Isolated Vercel Project
         id: deploy
         run: |
-          URL=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes 2>&1 | grep -oE 'https://[^ ]+\.vercel\.app' | tail -1)
+          # CRITICAL: Create a NEW Vercel project with explicit name
+          # This prevents collision with machinemind-telegram or other projects
+
+          # Remove any existing .vercel folder to prevent linking to wrong project
+          rm -rf .vercel
+
+          # Create new project explicitly with unique name
+          # --name flag ensures this deploys to PROJECT_NAME.vercel.app, not any existing project
+          vercel link --yes --project="$PROJECT_NAME" --token=${{ secrets.VERCEL_TOKEN }} 2>/dev/null || \
+          vercel project add "$PROJECT_NAME" --token=${{ secrets.VERCEL_TOKEN }} 2>/dev/null || true
+
+          # Deploy with explicit project name flag
+          DEPLOY_OUTPUT=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes --name="$PROJECT_NAME" 2>&1)
+          echo "$DEPLOY_OUTPUT"
+
+          # Extract URL - prefer the aliased domain
+          URL=$(echo "$DEPLOY_OUTPUT" | grep -oE "https://${PROJECT_NAME}[^ ]*\.vercel\.app" | head -1)
+
+          # Fallback to any vercel.app URL
+          if [ -z "$URL" ]; then
+            URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[^ ]+\.vercel\.app' | tail -1)
+          fi
+
+          echo "Deployed to: $URL"
           echo "url=$URL" >> $GITHUB_OUTPUT
         continue-on-error: true
 
