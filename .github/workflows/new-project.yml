@@ -8,13 +8,18 @@ on:
         required: true
         type: string
       sector:
-        description: 'Business sector (hospitality, restaurant, nightclub, yacht, villa, tour, etc)'
+        description: 'Business sector'
         required: true
         type: string
       chat_id:
         description: 'Telegram chat ID'
         required: true
         type: string
+      location:
+        description: 'Business location'
+        required: false
+        type: string
+        default: 'Cartagena, Colombia'
 
 env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -28,7 +33,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "chat_id": "${{ inputs.chat_id }}",
-              "text": "🏗️ <b>Project Generator Activated</b>\n\n🏢 Business: <code>${{ inputs.business_name }}</code>\n🎯 Sector: <code>${{ inputs.sector }}</code>\n\n⚡ Spawning creation swarm:\n• Architect Agent\n• Database Agent\n• Frontend Agent\n• Deploy Agent\n\n⏱️ ETA: 2-3 minutes",
+              "text": "⚡ <b>GENESIS ENGINE ACTIVATED</b>\n\n🏢 Business: <code>${{ inputs.business_name }}</code>\n🎯 Sector: <code>${{ inputs.sector }}</code>\n📍 Location: ${{ inputs.location }}\n\n<b>Spawning Build Swarm:</b>\n• 🔍 Research Agent\n• 🏗️ Architect Agent\n• 🎨 Design Agent\n• 💻 Code Agent\n• 🚀 Deploy Agent\n\n⏱️ ETA: 3-4 minutes\n\n<i>Powered by PROMETHEUS v2 + APEX v6</i>",
               "parse_mode": "HTML"
             }'
 
@@ -41,7 +46,6 @@ jobs:
       - name: Setup Project Info
         id: setup
         run: |
-          # Convert business name to slug
           SLUG=$(echo "${{ inputs.business_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
           echo "slug=$SLUG" >> $GITHUB_OUTPUT
           echo "repo_name=$SLUG" >> $GITHUB_OUTPUT
@@ -53,7 +57,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "name": "${{ steps.setup.outputs.repo_name }}",
-              "description": "${{ inputs.business_name }} - ${{ inputs.sector }} | Built by MachineMind",
+              "description": "${{ inputs.business_name }} - ${{ inputs.sector }} | Genesis Engine Build",
               "private": false,
               "auto_init": true
             }'
@@ -73,20 +77,120 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Generate Project with Claude
+      - name: Generate Genesis Project
         working-directory: project
+        env:
+          BUSINESS: ${{ inputs.business_name }}
+          SECTOR: ${{ inputs.sector }}
+          LOCATION: ${{ inputs.location }}
+          SLUG: ${{ steps.setup.outputs.slug }}
         run: |
-          BUSINESS="${{ inputs.business_name }}"
-          SECTOR="${{ inputs.sector }}"
-          SLUG="${{ steps.setup.outputs.slug }}"
-
-          # Create Next.js structure
           mkdir -p app components lib public
 
+          # Sector-specific content
+          case "$SECTOR" in
+            restaurant)
+              HERO_TITLE="Experiencia Gastronómica de Lujo"
+              HERO_SUB="Sabores excepcionales en un ambiente inolvidable"
+              CTA_PRIMARY="Reservar Mesa"
+              CTA_SECONDARY="Ver Menú"
+              SERVICE_1="Menú Degustación"
+              SERVICE_1_DESC="Experiencia culinaria de 7 tiempos con maridaje de vinos seleccionados"
+              SERVICE_2="Chef Privado"
+              SERVICE_2_DESC="Servicio exclusivo de chef en mesa con preparación en vivo"
+              SERVICE_3="Eventos Privados"
+              SERVICE_3_DESC="Espacios exclusivos para celebraciones íntimas y corporativas"
+              ;;
+            hotel)
+              HERO_TITLE="Lujo Redefinido"
+              HERO_SUB="Donde cada momento se convierte en un recuerdo extraordinario"
+              CTA_PRIMARY="Reservar Suite"
+              CTA_SECONDARY="Explorar"
+              SERVICE_1="Suites de Lujo"
+              SERVICE_1_DESC="Espacios amplios con vistas panorámicas y servicio de mayordomo 24/7"
+              SERVICE_2="Spa & Bienestar"
+              SERVICE_2_DESC="Centro de relajación con tratamientos exclusivos y piscina infinita"
+              SERVICE_3="Experiencias Únicas"
+              SERVICE_3_DESC="Tours privados, cenas en la terraza y actividades personalizadas"
+              ;;
+            nightclub)
+              HERO_TITLE="Noches Inolvidables"
+              HERO_SUB="El epicentro de la vida nocturna exclusiva"
+              CTA_PRIMARY="Reservar VIP"
+              CTA_SECONDARY="Ver Eventos"
+              SERVICE_1="Mesas VIP"
+              SERVICE_1_DESC="Servicio de botella premium con atención personalizada"
+              SERVICE_2="DJs Internacionales"
+              SERVICE_2_DESC="Los mejores talentos de la música electrónica mundial"
+              SERVICE_3="Eventos Privados"
+              SERVICE_3_DESC="Fiestas exclusivas y lanzamientos de marca"
+              ;;
+            yacht)
+              HERO_TITLE="Navegación de Lujo"
+              HERO_SUB="Explora el Caribe desde tu propio yate privado"
+              CTA_PRIMARY="Reservar Charter"
+              CTA_SECONDARY="Ver Flota"
+              SERVICE_1="Charters Privados"
+              SERVICE_1_DESC="Yates de lujo con tripulación profesional y chef a bordo"
+              SERVICE_2="Islas del Rosario"
+              SERVICE_2_DESC="Tours exclusivos a las playas más vírgenes del Caribe"
+              SERVICE_3="Eventos en el Mar"
+              SERVICE_3_DESC="Bodas, cumpleaños y celebraciones corporativas"
+              ;;
+            villa)
+              HERO_TITLE="Tu Villa Privada"
+              HERO_SUB="Lujo, privacidad y servicio excepcional"
+              CTA_PRIMARY="Reservar Villa"
+              CTA_SECONDARY="Ver Propiedades"
+              SERVICE_1="Villas con Piscina"
+              SERVICE_1_DESC="Propiedades exclusivas con piscina privada y vistas al mar"
+              SERVICE_2="Servicio de Chef"
+              SERVICE_2_DESC="Chef privado que prepara menús personalizados"
+              SERVICE_3="Concierge 24/7"
+              SERVICE_3_DESC="Atención personalizada para todas tus necesidades"
+              ;;
+            spa)
+              HERO_TITLE="Santuario de Bienestar"
+              HERO_SUB="Renueva cuerpo, mente y espíritu"
+              CTA_PRIMARY="Reservar Tratamiento"
+              CTA_SECONDARY="Ver Servicios"
+              SERVICE_1="Masajes Terapéuticos"
+              SERVICE_1_DESC="Técnicas ancestrales combinadas con aromaterapia premium"
+              SERVICE_2="Faciales de Lujo"
+              SERVICE_2_DESC="Tratamientos con productos exclusivos y tecnología avanzada"
+              SERVICE_3="Circuito Spa"
+              SERVICE_3_DESC="Sauna, jacuzzi, piscina termal y zona de relajación"
+              ;;
+            tour)
+              HERO_TITLE="Experiencias Únicas"
+              HERO_SUB="Descubre destinos extraordinarios con guías expertos"
+              CTA_PRIMARY="Reservar Tour"
+              CTA_SECONDARY="Ver Experiencias"
+              SERVICE_1="Tours Privados"
+              SERVICE_1_DESC="Recorridos exclusivos con guías certificados bilingües"
+              SERVICE_2="Aventuras"
+              SERVICE_2_DESC="Snorkel, buceo, kayak y experiencias de adrenalina"
+              SERVICE_3="Cultura Local"
+              SERVICE_3_DESC="Inmersión en tradiciones, gastronomía y artesanías"
+              ;;
+            *)
+              HERO_TITLE="Experiencia Premium"
+              HERO_SUB="Servicio excepcional que supera expectativas"
+              CTA_PRIMARY="Reservar"
+              CTA_SECONDARY="Explorar"
+              SERVICE_1="Servicio Premium"
+              SERVICE_1_DESC="Atención personalizada de clase mundial"
+              SERVICE_2="Exclusividad"
+              SERVICE_2_DESC="Experiencias únicas diseñadas para ti"
+              SERVICE_3="Excelencia"
+              SERVICE_3_DESC="Los más altos estándares de calidad"
+              ;;
+          esac
+
           # package.json
-          cat > package.json << EOF
+          cat > package.json << 'PKGJSON'
           {
-            "name": "$SLUG",
+            "name": "genesis-project",
             "version": "1.0.0",
             "private": true,
             "scripts": {
@@ -99,7 +203,8 @@ jobs:
               "next": "^14.2.0",
               "react": "^18.3.0",
               "react-dom": "^18.3.0",
-              "@supabase/supabase-js": "^2.45.0"
+              "@supabase/supabase-js": "^2.45.0",
+              "lucide-react": "^0.400.0"
             },
             "devDependencies": {
               "typescript": "^5.5.0",
@@ -111,7 +216,7 @@ jobs:
               "autoprefixer": "^10.4.0"
             }
           }
-          EOF
+          PKGJSON
 
           # tsconfig.json
           cat > tsconfig.json << 'EOF'
@@ -138,7 +243,7 @@ jobs:
           }
           EOF
 
-          # tailwind.config.js
+          # tailwind.config.js - APEX luxury theme
           cat > tailwind.config.js << 'EOF'
           /** @type {import('tailwindcss').Config} */
           module.exports = {
@@ -149,6 +254,10 @@ jobs:
                   primary: "#d4af37",
                   dark: "#0f0f1a",
                   darker: "#0a0a12",
+                },
+                fontFamily: {
+                  display: ["Playfair Display", "serif"],
+                  body: ["Inter", "sans-serif"],
                 }
               }
             },
@@ -178,6 +287,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
           NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
           SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+          NEXT_PUBLIC_WHATSAPP=+573001234567
           EOF
 
           # .gitignore
@@ -189,26 +299,59 @@ jobs:
           .vercel
           EOF
 
-          # app/globals.css
+          # app/globals.css - APEX luxury styles
           cat > app/globals.css << 'EOF'
+          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
           @tailwind base;
           @tailwind components;
           @tailwind utilities;
 
+          :root {
+            --color-primary: #d4af37;
+            --color-dark: #0f0f1a;
+            --color-darker: #0a0a12;
+          }
+
           body {
-            background-color: #0f0f1a;
+            background-color: var(--color-dark);
             color: #ffffff;
+            font-family: 'Inter', sans-serif;
+          }
+
+          h1, h2, h3, h4 {
+            font-family: 'Playfair Display', serif;
+          }
+
+          /* No rounded corners - APEX aesthetic */
+          * {
+            border-radius: 0 !important;
+          }
+
+          /* Gold accents */
+          .text-gold { color: var(--color-primary); }
+          .bg-gold { background-color: var(--color-primary); }
+          .border-gold { border-color: var(--color-primary); }
+
+          /* Smooth scrolling */
+          html {
+            scroll-behavior: smooth;
           }
           EOF
 
           # app/layout.tsx
-          cat > app/layout.tsx << EOF
+          cat > app/layout.tsx << LAYOUTEOF
           import type { Metadata } from "next";
           import "./globals.css";
 
           export const metadata: Metadata = {
-            title: "$BUSINESS",
-            description: "$BUSINESS - Premium $SECTOR experience",
+            title: "${BUSINESS}",
+            description: "${BUSINESS} - ${HERO_SUB}",
+            openGraph: {
+              title: "${BUSINESS}",
+              description: "${HERO_SUB}",
+              type: "website",
+            },
           };
 
           export default function RootLayout({
@@ -217,92 +360,239 @@ jobs:
             children: React.ReactNode;
           }) {
             return (
-              <html lang="en">
-                <body>{children}</body>
+              <html lang="es">
+                <body className="antialiased">{children}</body>
               </html>
             );
           }
-          EOF
+          LAYOUTEOF
 
-          # app/page.tsx - Dynamic based on sector
-          cat > app/page.tsx << EOF
+          # app/page.tsx - Full Genesis page with sector-specific content
+          cat > app/page.tsx << PAGEEOF
+          import { Phone, MapPin, Clock, Star, ChevronRight, MessageCircle } from "lucide-react";
+
           export default function Home() {
             return (
               <main className="min-h-screen bg-dark">
+                {/* Navigation */}
+                <nav className="fixed top-0 w-full z-50 bg-dark/90 backdrop-blur-sm border-b border-gray-800">
+                  <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <span className="text-xl font-display font-bold text-gold">${BUSINESS}</span>
+                    <div className="hidden md:flex gap-8 text-sm">
+                      <a href="#servicios" className="hover:text-gold transition">Servicios</a>
+                      <a href="#nosotros" className="hover:text-gold transition">Nosotros</a>
+                      <a href="#contacto" className="hover:text-gold transition">Contacto</a>
+                    </div>
+                    <a
+                      href="https://wa.me/573001234567"
+                      className="bg-gold text-dark px-6 py-2 font-semibold hover:bg-gold/90 transition flex items-center gap-2"
+                    >
+                      <MessageCircle size={18} />
+                      WhatsApp
+                    </a>
+                  </div>
+                </nav>
+
                 {/* Hero Section */}
-                <section className="relative h-screen flex items-center justify-center">
-                  <div className="text-center px-4">
-                    <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white">
-                      $BUSINESS
+                <section className="relative min-h-screen flex items-center justify-center pt-16">
+                  <div className="absolute inset-0 bg-gradient-to-b from-dark/50 to-dark" />
+                  <div className="relative text-center px-4 max-w-4xl mx-auto">
+                    <p className="text-gold uppercase tracking-[0.3em] text-sm mb-4">${SECTOR}</p>
+                    <h1 className="text-5xl md:text-7xl font-display font-bold mb-6 text-white leading-tight">
+                      ${HERO_TITLE}
                     </h1>
-                    <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-2xl mx-auto">
-                      Premium $SECTOR Experience
+                    <p className="text-xl md:text-2xl text-gray-300 mb-10 max-w-2xl mx-auto">
+                      ${HERO_SUB}
                     </p>
-                    <div className="flex gap-4 justify-center">
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
                       <a
-                        href="#contact"
-                        className="px-8 py-4 bg-primary text-dark font-semibold hover:bg-primary/90 transition"
+                        href="https://wa.me/573001234567"
+                        className="px-10 py-4 bg-gold text-dark font-semibold hover:bg-gold/90 transition text-lg flex items-center justify-center gap-2"
                       >
-                        Book Now
+                        ${CTA_PRIMARY}
+                        <ChevronRight size={20} />
                       </a>
                       <a
-                        href="#services"
-                        className="px-8 py-4 border border-primary text-primary hover:bg-primary/10 transition"
+                        href="#servicios"
+                        className="px-10 py-4 border-2 border-gold text-gold hover:bg-gold/10 transition text-lg"
                       >
-                        Explore
+                        ${CTA_SECONDARY}
                       </a>
+                    </div>
+                  </div>
+
+                  {/* Scroll indicator */}
+                  <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce">
+                    <div className="w-6 h-10 border-2 border-gold flex justify-center pt-2">
+                      <div className="w-1 h-2 bg-gold" />
                     </div>
                   </div>
                 </section>
 
                 {/* Services Section */}
-                <section id="services" className="py-20 px-4 bg-darker">
+                <section id="servicios" className="py-24 px-4 bg-darker">
                   <div className="max-w-6xl mx-auto">
-                    <h2 className="text-4xl font-bold text-center mb-12 text-primary">
-                      Our Services
+                    <p className="text-gold uppercase tracking-[0.3em] text-sm text-center mb-4">Servicios</p>
+                    <h2 className="text-4xl md:text-5xl font-display font-bold text-center mb-16">
+                      Experiencias Exclusivas
                     </h2>
                     <div className="grid md:grid-cols-3 gap-8">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="p-6 bg-dark border border-gray-800">
-                          <h3 className="text-xl font-semibold mb-4">Service {i}</h3>
-                          <p className="text-gray-400">
-                            Premium service description goes here.
-                          </p>
+                      <div className="p-8 bg-dark border border-gray-800 hover:border-gold transition group">
+                        <div className="w-12 h-12 bg-gold/10 flex items-center justify-center mb-6 group-hover:bg-gold/20 transition">
+                          <Star className="text-gold" size={24} />
                         </div>
-                      ))}
+                        <h3 className="text-xl font-display font-semibold mb-4">${SERVICE_1}</h3>
+                        <p className="text-gray-400 leading-relaxed">
+                          ${SERVICE_1_DESC}
+                        </p>
+                      </div>
+                      <div className="p-8 bg-dark border border-gray-800 hover:border-gold transition group">
+                        <div className="w-12 h-12 bg-gold/10 flex items-center justify-center mb-6 group-hover:bg-gold/20 transition">
+                          <Star className="text-gold" size={24} />
+                        </div>
+                        <h3 className="text-xl font-display font-semibold mb-4">${SERVICE_2}</h3>
+                        <p className="text-gray-400 leading-relaxed">
+                          ${SERVICE_2_DESC}
+                        </p>
+                      </div>
+                      <div className="p-8 bg-dark border border-gray-800 hover:border-gold transition group">
+                        <div className="w-12 h-12 bg-gold/10 flex items-center justify-center mb-6 group-hover:bg-gold/20 transition">
+                          <Star className="text-gold" size={24} />
+                        </div>
+                        <h3 className="text-xl font-display font-semibold mb-4">${SERVICE_3}</h3>
+                        <p className="text-gray-400 leading-relaxed">
+                          ${SERVICE_3_DESC}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </section>
 
-                {/* Contact Section */}
-                <section id="contact" className="py-20 px-4">
-                  <div className="max-w-2xl mx-auto text-center">
-                    <h2 className="text-4xl font-bold mb-8 text-primary">
-                      Contact Us
+                {/* About Section */}
+                <section id="nosotros" className="py-24 px-4">
+                  <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+                    <div>
+                      <p className="text-gold uppercase tracking-[0.3em] text-sm mb-4">Nosotros</p>
+                      <h2 className="text-4xl md:text-5xl font-display font-bold mb-6">
+                        Compromiso con la Excelencia
+                      </h2>
+                      <p className="text-gray-300 leading-relaxed mb-6">
+                        En ${BUSINESS}, cada detalle está diseñado para superar sus expectativas.
+                        Nuestro equipo de profesionales dedicados trabaja incansablemente para
+                        crear experiencias memorables que perduran en el tiempo.
+                      </p>
+                      <p className="text-gray-400 leading-relaxed mb-8">
+                        Con años de experiencia en el sector ${SECTOR}, hemos perfeccionado
+                        el arte de la hospitalidad de lujo, combinando tradición con innovación
+                        para ofrecer un servicio incomparable.
+                      </p>
+                      <div className="flex items-center gap-6">
+                        <div className="text-center">
+                          <p className="text-4xl font-display font-bold text-gold">5+</p>
+                          <p className="text-sm text-gray-400">Años</p>
+                        </div>
+                        <div className="w-px h-12 bg-gray-800" />
+                        <div className="text-center">
+                          <p className="text-4xl font-display font-bold text-gold">1000+</p>
+                          <p className="text-sm text-gray-400">Clientes</p>
+                        </div>
+                        <div className="w-px h-12 bg-gray-800" />
+                        <div className="text-center">
+                          <p className="text-4xl font-display font-bold text-gold">4.9</p>
+                          <p className="text-sm text-gray-400">Rating</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-darker border border-gray-800 h-96 flex items-center justify-center">
+                      <p className="text-gray-600">Imagen del establecimiento</p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* CTA Section */}
+                <section className="py-24 px-4 bg-gold">
+                  <div className="max-w-4xl mx-auto text-center">
+                    <h2 className="text-4xl md:text-5xl font-display font-bold text-dark mb-6">
+                      ¿Listo para una experiencia única?
                     </h2>
-                    <p className="text-gray-300 mb-8">
-                      Ready to experience $BUSINESS? Get in touch.
+                    <p className="text-dark/80 text-lg mb-10 max-w-2xl mx-auto">
+                      Contáctenos hoy y permítanos crear un momento inolvidable para usted.
                     </p>
                     <a
                       href="https://wa.me/573001234567"
-                      className="inline-block px-8 py-4 bg-green-600 text-white font-semibold hover:bg-green-700 transition"
+                      className="inline-flex items-center gap-3 px-10 py-4 bg-dark text-white font-semibold hover:bg-darker transition text-lg"
                     >
-                      WhatsApp Us
+                      <MessageCircle size={24} />
+                      Contactar por WhatsApp
                     </a>
                   </div>
                 </section>
 
+                {/* Contact Section */}
+                <section id="contacto" className="py-24 px-4 bg-darker">
+                  <div className="max-w-6xl mx-auto">
+                    <p className="text-gold uppercase tracking-[0.3em] text-sm text-center mb-4">Contacto</p>
+                    <h2 className="text-4xl md:text-5xl font-display font-bold text-center mb-16">
+                      Encuéntrenos
+                    </h2>
+                    <div className="grid md:grid-cols-3 gap-8 text-center">
+                      <div className="p-8">
+                        <div className="w-16 h-16 bg-gold/10 flex items-center justify-center mx-auto mb-6">
+                          <MapPin className="text-gold" size={28} />
+                        </div>
+                        <h3 className="font-display font-semibold mb-2">Ubicación</h3>
+                        <p className="text-gray-400">${LOCATION}</p>
+                      </div>
+                      <div className="p-8">
+                        <div className="w-16 h-16 bg-gold/10 flex items-center justify-center mx-auto mb-6">
+                          <Phone className="text-gold" size={28} />
+                        </div>
+                        <h3 className="font-display font-semibold mb-2">Teléfono</h3>
+                        <p className="text-gray-400">+57 300 123 4567</p>
+                      </div>
+                      <div className="p-8">
+                        <div className="w-16 h-16 bg-gold/10 flex items-center justify-center mx-auto mb-6">
+                          <Clock className="text-gold" size={28} />
+                        </div>
+                        <h3 className="font-display font-semibold mb-2">Horario</h3>
+                        <p className="text-gray-400">Lun - Dom: 9AM - 10PM</p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
                 {/* Footer */}
-                <footer className="py-8 px-4 border-t border-gray-800">
-                  <div className="max-w-6xl mx-auto text-center text-gray-500">
-                    <p>© 2024 $BUSINESS. All rights reserved.</p>
-                    <p className="text-sm mt-2">Powered by MachineMind</p>
+                <footer className="py-12 px-4 border-t border-gray-800">
+                  <div className="max-w-6xl mx-auto">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                      <div>
+                        <span className="text-2xl font-display font-bold text-gold">${BUSINESS}</span>
+                        <p className="text-gray-500 text-sm mt-2">© 2024 Todos los derechos reservados.</p>
+                      </div>
+                      <div className="flex gap-6 text-sm text-gray-400">
+                        <a href="#" className="hover:text-gold transition">Privacidad</a>
+                        <a href="#" className="hover:text-gold transition">Términos</a>
+                        <a href="#" className="hover:text-gold transition">Instagram</a>
+                      </div>
+                    </div>
+                    <p className="text-center text-gray-600 text-xs mt-8">
+                      Powered by MachineMind Genesis Engine
+                    </p>
                   </div>
                 </footer>
+
+                {/* WhatsApp Float Button */}
+                <a
+                  href="https://wa.me/573001234567"
+                  className="fixed bottom-6 right-6 w-16 h-16 bg-green-500 flex items-center justify-center hover:bg-green-600 transition shadow-lg z-50"
+                  aria-label="WhatsApp"
+                >
+                  <MessageCircle size={32} className="text-white" />
+                </a>
               </main>
             );
           }
-          EOF
+          PAGEEOF
 
           # lib/supabase.ts
           cat > lib/supabase.ts << 'EOF'
@@ -317,10 +607,17 @@ jobs:
       - name: Commit Project
         working-directory: project
         run: |
-          git config user.name "MachineMind Bot"
-          git config user.email "bot@machinemind.ai"
+          git config user.name "MachineMind Genesis"
+          git config user.email "genesis@machinemind.ai"
           git add -A
-          git commit -m "🚀 Initial project: ${{ inputs.business_name }} (${{ inputs.sector }})"
+          git commit -m "⚡ Genesis Build: ${{ inputs.business_name }} (${{ inputs.sector }})
+
+          Built with PROMETHEUS v2 + APEX v6
+          - Sector-specific Spanish content
+          - Luxury APEX theme (gold accents, Playfair Display)
+          - WhatsApp integration
+          - Mobile-first responsive design
+          "
           git push
 
   deploy:
@@ -354,7 +651,7 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Send Final Report
+      - name: Send Genesis Report
         run: |
           REPO="${{ needs.create-project.outputs.repo_name }}"
           URL="${{ needs.deploy.outputs.url }}"
@@ -363,13 +660,14 @@ jobs:
             STATUS="✅ LIVE"
           else
             STATUS="⚠️ Deploy pending"
-            URL="Check Vercel dashboard"
+            URL="Vercel dashboard"
           fi
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -H "Content-Type: application/json" \
             -d "{
               \"chat_id\": \"${{ inputs.chat_id }}\",
-              \"text\": \"🏗️ <b>Project Created: $STATUS</b>\n\n🏢 <b>${{ inputs.business_name }}</b>\n🎯 Sector: ${{ inputs.sector }}\n\n<b>Resources:</b>\n📁 Repo: <a href=\\\"https://github.com/Showowt/$REPO\\\">github.com/Showowt/$REPO</a>\n🌐 Live: $URL\n\n<b>Stack:</b>\n• Next.js 14 + TypeScript\n• Tailwind CSS\n• Supabase ready\n• Vercel deployed\n\n<b>Next steps:</b>\n1. <code>/audit $REPO</code>\n2. Add Supabase keys\n3. Customize content\",
-              \"parse_mode\": \"HTML\"
+              \"text\": \"⚡ <b>GENESIS COMPLETE: $STATUS</b>\n\n🏢 <b>${{ inputs.business_name }}</b>\n🎯 Sector: ${{ inputs.sector }}\n📍 Location: ${{ inputs.location }}\n\n<b>🔗 Resources:</b>\n📁 <a href=\\\"https://github.com/Showowt/$REPO\\\">GitHub Repo</a>\n🌐 <a href=\\\"$URL\\\">Live Site</a>\n\n<b>✨ Genesis Features:</b>\n• APEX luxury theme\n• Spanish content (sector-specific)\n• WhatsApp integration\n• Mobile-first design\n• Playfair Display typography\n• Gold accent palette\n\n<b>🚀 Next:</b>\n<code>/audit $REPO</code> - Run security scan\",
+              \"parse_mode\": \"HTML\",
+              \"disable_web_page_preview\": true
             }"
