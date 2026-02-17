@@ -7,9 +7,23 @@
  * 2. Architecture patterns from APEX/PROMETHEUS inform structure
  * 3. Build Memory learns from every past build
  * 4. Sector-specific templates evolve over time
+ *
+ * Now enhanced with:
+ * - APEX FINISHING ENGINE v3 (12-dimension excellence)
+ * - INTERFACE PERFECTION ENGINE v2 (visual standards)
+ * - SIGNATURE EXPERIENCE ENGINE v2 (memorable interactions)
  */
 
 import { BusinessResearch } from "./research";
+import {
+  APEX_FINISHING_ENGINE,
+  INTERFACE_PERFECTION_ENGINE,
+  SIGNATURE_EXPERIENCE_ENGINE,
+  selectGenesisProtocol,
+  generateProtocolPrompt,
+  GenesisProtocolConfig,
+  SIGNATURE_COMPONENTS,
+} from "./engine-protocols";
 
 // ============================================================================
 // ARCHITECTURE PATTERNS - The DNA of every build
@@ -652,6 +666,22 @@ export interface GenesisBuildConfig {
   // APEX Layers Applied
   apexLayers: string[];
 
+  // ENGINE PROTOCOLS - New v3 additions
+  engineProtocols: {
+    // APEX FINISHING ENGINE - 12 dimensions
+    apexDimensions: string[];
+    // INTERFACE PERFECTION ENGINE - visual standards
+    interfaceTokens: Record<string, string>;
+    // SIGNATURE EXPERIENCE ENGINE - memorable interactions
+    signatureExperiences: {
+      essential: string[];
+      recommended: string[];
+      implemented: string[];
+    };
+    // Components to generate
+    signatureComponents: string[];
+  };
+
   // Build Metadata
   meta: {
     chatId: string;
@@ -666,6 +696,7 @@ export interface GenesisBuildConfig {
 
 /**
  * Generate a complete build config from research + templates
+ * Now enhanced with ENGINE PROTOCOLS v3
  */
 export function generateBuildConfig(
   research: BusinessResearch,
@@ -674,11 +705,20 @@ export function generateBuildConfig(
   const template =
     SECTOR_TEMPLATES[research.sector] || SECTOR_TEMPLATES.hospitality;
 
-  // Merge research colors with template defaults
+  // Get ENGINE PROTOCOLS configuration for this sector
+  const protocolConfig = selectGenesisProtocol(research.sector);
+
+  // Merge research colors with template defaults, respecting sector variants
   const colors = {
     primary: research.brandColors[0] || template.colorScheme.primary,
-    accent: research.brandColors[1] || template.colorScheme.accent,
-    background: research.brandColors[2] || template.colorScheme.background,
+    accent:
+      protocolConfig.interfaceTokens.accent ||
+      research.brandColors[1] ||
+      template.colorScheme.accent,
+    background:
+      protocolConfig.interfaceTokens.background ||
+      research.brandColors[2] ||
+      template.colorScheme.background,
     text: template.colorScheme.text,
   };
 
@@ -688,10 +728,25 @@ export function generateBuildConfig(
     .replace("[city]", research.location.city)
     .replace("[destination]", research.location.city);
 
-  // Get blue ocean vector details
-  const blueOceanVector = BCB_PROTOCOLS.blue_ocean_vectors.find(
-    (v) => v.id === template.blueOceanVector,
-  );
+  // Get blue ocean vector details from engine protocols
+  const blueOceanVector =
+    APEX_FINISHING_ENGINE.blueOceanEnhancement.vectors.find(
+      (v) => v.id === protocolConfig.blueOceanVector.id,
+    ) ||
+    BCB_PROTOCOLS.blue_ocean_vectors.find(
+      (v) => v.id === template.blueOceanVector,
+    );
+
+  // Select signature components for this sector
+  const signatureComponents = Object.entries(SIGNATURE_COMPONENTS)
+    .filter(
+      ([_, c]) =>
+        c.sectors.includes(research.sector) || c.sectors.includes("all"),
+    )
+    .filter(([_, c]) =>
+      protocolConfig.signatureExperiences.implemented.includes(c.experience),
+    )
+    .map(([key]) => key);
 
   return {
     business: {
@@ -709,7 +764,7 @@ export function generateBuildConfig(
     },
     architecture: {
       pages: template.pages,
-      components: template.components,
+      components: [...template.components, ...signatureComponents],
       features: [...template.features, ...research.features.slice(0, 3)],
       integrations: template.integrations,
     },
@@ -723,26 +778,41 @@ export function generateBuildConfig(
       keywords: research.keywords,
     },
     blueOcean: {
-      vector: blueOceanVector?.name || "Intelligence Layer",
+      vector: blueOceanVector?.id || protocolConfig.blueOceanVector.id,
       implementation:
-        blueOceanVector?.question ||
-        "What insights emerge that create dependency?",
+        blueOceanVector?.question || protocolConfig.blueOceanVector.question,
     },
     apexLayers: Object.keys(APEX_LAYERS),
+    // ENGINE PROTOCOLS v3 integration
+    engineProtocols: {
+      apexDimensions: protocolConfig.apexDimensions,
+      interfaceTokens: protocolConfig.interfaceTokens,
+      signatureExperiences: protocolConfig.signatureExperiences,
+      signatureComponents,
+    },
     meta: {
       chatId: String(chatId),
       requestedAt: new Date().toISOString(),
-      estimatedDrops: template.pages.length + 2, // pages + setup + deploy
+      estimatedDrops: template.pages.length + signatureComponents.length + 2,
     },
   };
 }
 
 /**
  * Format build config for Telegram display
+ * Now shows ENGINE PROTOCOLS v3 configuration
  */
 export function formatBuildConfigForTelegram(
   config: GenesisBuildConfig,
 ): string {
+  const signatureList = config.engineProtocols.signatureExperiences.implemented
+    .slice(0, 3)
+    .join(", ");
+
+  const componentsToAdd = config.engineProtocols.signatureComponents
+    .slice(0, 3)
+    .join(", ");
+
   return `⚡ <b>GENESIS BUILD CONFIG</b>
 
 <b>📋 Business:</b>
@@ -750,11 +820,11 @@ export function formatBuildConfigForTelegram(
 • Sector: ${config.business.sector}
 • Location: ${config.business.location.city}, ${config.business.location.country}
 
-<b>🎨 Design System:</b>
+<b>🎨 Design System (INTERFACE PERFECTION):</b>
 • Primary: ${config.design.colors.primary}
 • Accent: ${config.design.colors.accent}
 • Typography: ${config.design.typography.heading} / ${config.design.typography.body}
-• Style: ${config.design.style}
+• Style: ${config.design.style} | No rounded corners
 
 <b>🏗️ Architecture:</b>
 • Pages: ${config.architecture.pages.length}
@@ -765,6 +835,11 @@ export function formatBuildConfigForTelegram(
 • ${config.blueOcean.vector}
 • ${config.blueOcean.implementation}
 
+<b>⚡ ENGINE PROTOCOLS ACTIVE:</b>
+• APEX: ${config.engineProtocols.apexDimensions.length} dimensions
+• Signature Experiences: ${signatureList}
+• Components: ${componentsToAdd || "micro_interactions"}
+
 <b>📦 APEX Layers:</b> All 4 active
 <b>📅 Est. Drops:</b> ${config.meta.estimatedDrops}
 
@@ -774,23 +849,63 @@ export function formatBuildConfigForTelegram(
 
 /**
  * Generate the prompt for Claude to build the project
+ * Now includes full ENGINE PROTOCOLS v3 context
  */
 export function generateBuildPrompt(config: GenesisBuildConfig): string {
-  return `You are the GENESIS BUILD ENGINE, powered by PROMETHEUS v2 and APEX v6.
+  // Get engine protocol configuration for enhanced prompt
+  const protocolConfig = selectGenesisProtocol(config.business.sector);
+  const protocolPrompt = generateProtocolPrompt(protocolConfig);
+
+  // Get APEX dimension checklist items
+  const apexChecklist = Object.values(APEX_FINISHING_ENGINE.dimensions)
+    .map((d) => `- ${d.name}: ${d.checklist[0]}`)
+    .slice(0, 6)
+    .join("\n");
+
+  // Get signature components to implement
+  type SignatureComponentKey = keyof typeof SIGNATURE_COMPONENTS;
+  const signatureComponentsList = config.engineProtocols.signatureComponents
+    .map((key) => {
+      const comp = SIGNATURE_COMPONENTS[key as SignatureComponentKey];
+      return comp ? `- ${comp.name}: ${comp.description}` : null;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  return `You are the GENESIS BUILD ENGINE, powered by PROMETHEUS v2, APEX v6, and ENGINE PROTOCOLS v3.
 
 You are building: ${config.business.name}
 Sector: ${config.business.sector}
 Location: ${config.business.location.city}, ${config.business.location.country}
 
-== DESIGN SYSTEM ==
+== DESIGN SYSTEM (INTERFACE PERFECTION ENGINE v2) ==
 Colors: Primary ${config.design.colors.primary}, Accent ${config.design.colors.accent}
 Typography: ${config.design.typography.heading} (headings), ${config.design.typography.body} (body)
-Style: Luxury hospitality aesthetic - no rounded corners, no gradients, no shadows
+Style: Luxury hospitality aesthetic
+
+CRITICAL INTERFACE RULES:
+- NO rounded corners (border-radius: 0)
+- NO gradients (solid colors only)
+- NO shadows (flat design)
+- 56px minimum touch targets
+- WCAG 4.5:1 contrast ratio
+- Prices in WHITE (not accent color)
 
 == ARCHITECTURE ==
 Pages to build: ${config.architecture.pages.join(", ")}
 Components needed: ${config.architecture.components.join(", ")}
 Key features: ${config.architecture.features.join(", ")}
+
+== SIGNATURE EXPERIENCE ENGINE v2 ==
+Essential experiences for ${config.business.sector}:
+${config.engineProtocols.signatureExperiences.essential.map((e) => `- ${e}`).join("\n")}
+
+Signature components to implement:
+${signatureComponentsList || "- micro_interactions (hover states, transitions)"}
+
+== APEX FINISHING ENGINE v3 (12 Dimensions) ==
+${apexChecklist}
+...and 6 more dimensions for comprehensive excellence.
 
 == COPY ==
 Hero: "${config.copy.hero}"
@@ -807,12 +922,30 @@ Build this unfair advantage into the architecture.
 3. Emergence: Modular components, plugin-ready services
 4. Transcendence: AI-ready, real-time, i18n structure
 
-== ZDBS REQUIREMENTS ==
-- Zero TODOs
+== ZDBS QUALITY GATE ==
+- Zero TODOs in any file
 - Every component: loading, error, empty states
-- Mobile responsive (Tailwind responsive classes)
-- Spanish + English strings
+- Mobile-first responsive (Tailwind responsive classes)
+- Spanish + English ready (es/en strings)
 - WCAG 2.1 AA accessibility
+- Touch targets 56px minimum
+- All buttons have hover states
+- All async operations have loading states
 
 Build this masterpiece.`;
 }
+
+// ============================================================================
+// RE-EXPORTS - Make ENGINE PROTOCOLS accessible via genesis-engine
+// ============================================================================
+
+export {
+  APEX_FINISHING_ENGINE,
+  INTERFACE_PERFECTION_ENGINE,
+  SIGNATURE_EXPERIENCE_ENGINE,
+  SIGNATURE_COMPONENTS,
+  selectGenesisProtocol,
+  generateProtocolPrompt,
+} from "./engine-protocols";
+
+export type { GenesisProtocolConfig } from "./engine-protocols";
