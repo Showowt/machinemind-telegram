@@ -93,3 +93,60 @@ export async function listRepos(owner: string): Promise<string[]> {
     return [];
   }
 }
+
+export interface RepoInfo {
+  name: string;
+  full_name: string;
+  html_url: string;
+  description: string | null;
+  updated_at: string;
+  language: string | null;
+}
+
+export async function listReposDetailed(owner: string): Promise<RepoInfo[]> {
+  try {
+    const data = await githubFetch<RepoInfo[]>(
+      `/users/${owner}/repos?per_page=100&sort=updated`,
+    );
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+export async function repoExists(
+  owner: string,
+  repo: string,
+): Promise<boolean> {
+  try {
+    await githubFetch(`/repos/${owner}/${repo}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function createRepo(
+  name: string,
+  description?: string,
+  isPrivate = false,
+): Promise<{ html_url: string; clone_url: string } | null> {
+  try {
+    const data = await githubFetch<{ html_url: string; clone_url: string }>(
+      "/user/repos",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          description: description || `${name} - MachineMind Project`,
+          private: isPrivate,
+          auto_init: true,
+        }),
+      },
+    );
+    return data;
+  } catch (error) {
+    console.error("Failed to create repo:", error);
+    return null;
+  }
+}

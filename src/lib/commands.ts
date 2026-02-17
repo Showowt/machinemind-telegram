@@ -11,7 +11,12 @@ import {
   promoteDeployment,
   cancelDeployment,
 } from "./vercel";
-import { triggerWorkflow } from "./github";
+import {
+  triggerWorkflow,
+  listReposDetailed,
+  repoExists,
+  createRepo,
+} from "./github";
 import {
   researchBusiness,
   formatResearchForTelegram,
@@ -66,6 +71,8 @@ const commands: Record<string, CommandHandler> = {
         `<code>/research [business]</code> — Scrape business intel\n\n` +
         `<b>🏗️ Create:</b>\n` +
         `<code>/new [business] [sector]</code> — Create full project\n\n` +
+        `<b>📦 GitHub:</b>\n` +
+        `<code>/repos</code> — List GitHub repos\n\n` +
         `<b>🔧 Build:</b>\n` +
         `<code>/genesis [project]</code> — Full autonomous build\n` +
         `<code>/audit [project]</code> — Security + quality scan\n` +
@@ -172,6 +179,53 @@ const commands: Record<string, CommandHandler> = {
     }
   },
 
+  repos: async (chatId, args) => {
+    await sendTyping(chatId);
+
+    try {
+      const repos = await listReposDetailed(GITHUB_OWNER);
+
+      if (repos.length === 0) {
+        await sendMessage(chatId, "📁 No GitHub repos found.");
+        return;
+      }
+
+      // Filter by search term if provided
+      let filtered = repos;
+      if (args.length > 0) {
+        const search = args[0].toLowerCase();
+        filtered = repos.filter(
+          (r) =>
+            r.name.toLowerCase().includes(search) ||
+            r.description?.toLowerCase().includes(search),
+        );
+      }
+
+      const list = filtered
+        .slice(0, 20)
+        .map((r, i) => {
+          const lang = r.language ? ` (${r.language})` : "";
+          const updated = new Date(r.updated_at).toLocaleDateString();
+          return `${i + 1}. <code>${r.name}</code>${lang}\n   📅 ${updated}`;
+        })
+        .join("\n");
+
+      const searchNote = args.length > 0 ? ` matching "${args[0]}"` : "";
+
+      await sendMessage(
+        chatId,
+        `📦 <b>GitHub Repos${searchNote}</b> (${filtered.length})\n\n${list}\n\n` +
+          `💡 These can be used with <code>/genesis [repo]</code>\n` +
+          `🔍 Search: <code>/repos [keyword]</code>`,
+      );
+    } catch (error) {
+      await sendMessage(
+        chatId,
+        `❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  },
+
   // ==================== CREATE COMMANDS ====================
 
   new: async (chatId, args) => {
@@ -254,13 +308,44 @@ const commands: Record<string, CommandHandler> = {
         `⚡ <b>Genesis Build</b>\n\n` +
           `Full autonomous build with ZDBS validation.\n\n` +
           `<b>Usage:</b> <code>/genesis [project-name]</code>\n` +
-          `<b>Example:</b> <code>/genesis simmer-down</code>`,
+          `<b>Example:</b> <code>/genesis simmer-down</code>\n\n` +
+          `💡 Use <code>/repos</code> to see available repos`,
       );
       return;
     }
 
     await sendTyping(chatId);
     const projectName = args[0];
+
+    // Check if repo exists on GitHub
+    const exists = await repoExists(GITHUB_OWNER, projectName);
+
+    if (!exists) {
+      // Check if maybe they meant a similar repo
+      const repos = await listReposDetailed(GITHUB_OWNER);
+      const similar = repos
+        .filter((r) => r.name.toLowerCase().includes(projectName.toLowerCase()))
+        .slice(0, 3);
+
+      let suggestion = "";
+      if (similar.length > 0) {
+        suggestion =
+          `\n\n<b>Did you mean:</b>\n` +
+          similar.map((r) => `• <code>${r.name}</code>`).join("\n");
+      }
+
+      await sendMessage(
+        chatId,
+        `❌ <b>Repo not found:</b> <code>${GITHUB_OWNER}/${projectName}</code>\n\n` +
+          `Genesis requires a GitHub repo to run CI/CD.\n\n` +
+          `<b>Options:</b>\n` +
+          `1️⃣ <code>/repos</code> — List your GitHub repos\n` +
+          `2️⃣ <code>/repos ${projectName}</code> — Search repos\n` +
+          `3️⃣ <code>/new "${projectName}" hospitality</code> — Create new project` +
+          suggestion,
+      );
+      return;
+    }
 
     const success = await triggerWorkflow(
       GITHUB_OWNER,
