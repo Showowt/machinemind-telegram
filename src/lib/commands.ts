@@ -11,6 +11,10 @@ import {
   promoteDeployment,
   cancelDeployment,
 } from "./vercel";
+import { triggerWorkflow } from "./github";
+
+const GITHUB_OWNER = "Showowt";
+const BOT_REPO = "machinemind-telegram";
 
 type CommandHandler = (chatId: number, args: string[]) => Promise<void>;
 
@@ -19,21 +23,25 @@ const commands: Record<string, CommandHandler> = {
     await sendMessage(
       chatId,
       `🚀 <b>MachineMind Command Center</b>\n\n` +
-        `<b>Deployment Commands:</b>\n` +
+        `<b>🔧 Build Commands:</b>\n` +
+        `<code>/genesis [project]</code> — Full autonomous build\n` +
+        `<code>/audit [project]</code> — Security + quality scan\n` +
+        `<code>/demo [project]</code> — Create preview deploy\n\n` +
+        `<b>🚀 Deployment:</b>\n` +
         `<code>/sites</code> — List all projects\n` +
         `<code>/status [project]</code> — Deployment status\n` +
         `<code>/deploy [project]</code> — Deploy to production\n` +
         `<code>/logs [project]</code> — Build logs\n` +
         `<code>/errors [project]</code> — Runtime errors\n` +
+        `<code>/rollback [project]</code> — Rollback to previous\n` +
         `<code>/cancel [project]</code> — Cancel active build\n\n` +
-        `<b>Project Info:</b>\n` +
+        `<b>📊 Project Info:</b>\n` +
         `<code>/domains [project]</code> — List domains\n` +
-        `<code>/env [project]</code> — Environment variables\n` +
-        `<code>/rollback [project]</code> — Rollback to previous\n\n` +
-        `<b>Utility:</b>\n` +
+        `<code>/env [project]</code> — Environment variables\n\n` +
+        `<b>⚡ Utility:</b>\n` +
         `<code>/ping</code> — Health check\n` +
         `<code>/help</code> — Show this message\n\n` +
-        `💡 Example: <code>/deploy simmer-down</code>`,
+        `💡 Example: <code>/genesis simmer-down</code>`,
     );
   },
 
@@ -48,9 +56,130 @@ const commands: Record<string, CommandHandler> = {
       `🏓 Pong! Response time: ${Date.now() - start}ms\n\n` +
         `🤖 Bot: Online\n` +
         `⚡ Vercel API: Connected\n` +
+        `🔗 GitHub Actions: Ready\n` +
         `🕐 Server Time: ${new Date().toISOString()}`,
     );
   },
+
+  // ==================== BUILD COMMANDS ====================
+
+  genesis: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `⚡ <b>Genesis Build</b>\n\n` +
+          `Full autonomous build with ZDBS validation.\n\n` +
+          `<b>Usage:</b> <code>/genesis [project-name]</code>\n` +
+          `<b>Example:</b> <code>/genesis simmer-down</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+
+    const success = await triggerWorkflow(
+      GITHUB_OWNER,
+      BOT_REPO,
+      "genesis.yml",
+      {
+        project: projectName,
+        chat_id: String(chatId),
+      },
+    );
+
+    if (success) {
+      await sendMessage(
+        chatId,
+        `⚡ <b>Genesis Build Triggered</b>\n\n` +
+          `📦 Project: <code>${projectName}</code>\n` +
+          `🔄 Status: Queued\n\n` +
+          `You'll receive updates as the build progresses.`,
+      );
+    } else {
+      await sendMessage(
+        chatId,
+        `❌ Failed to trigger Genesis build.\n\n` +
+          `Make sure GITHUB_TOKEN is configured.`,
+      );
+    }
+  },
+
+  audit: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🔍 <b>Security Audit</b>\n\n` +
+          `Scans for vulnerabilities, secrets, and code quality.\n\n` +
+          `<b>Usage:</b> <code>/audit [project-name]</code>\n` +
+          `<b>Example:</b> <code>/audit simmer-down</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+
+    const success = await triggerWorkflow(GITHUB_OWNER, BOT_REPO, "audit.yml", {
+      project: projectName,
+      chat_id: String(chatId),
+    });
+
+    if (success) {
+      await sendMessage(
+        chatId,
+        `🔍 <b>Security Audit Started</b>\n\n` +
+          `📦 Project: <code>${projectName}</code>\n` +
+          `🔄 Status: Scanning...\n\n` +
+          `You'll receive the audit report when complete.`,
+      );
+    } else {
+      await sendMessage(
+        chatId,
+        `❌ Failed to trigger audit.\n\n` +
+          `Make sure GITHUB_TOKEN is configured.`,
+      );
+    }
+  },
+
+  demo: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🎬 <b>Demo Deploy</b>\n\n` +
+          `Creates a preview deployment for client demos.\n\n` +
+          `<b>Usage:</b> <code>/demo [project-name]</code>\n` +
+          `<b>Example:</b> <code>/demo simmer-down</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+
+    const success = await triggerWorkflow(GITHUB_OWNER, BOT_REPO, "demo.yml", {
+      project: projectName,
+      chat_id: String(chatId),
+    });
+
+    if (success) {
+      await sendMessage(
+        chatId,
+        `🎬 <b>Demo Deploy Started</b>\n\n` +
+          `📦 Project: <code>${projectName}</code>\n` +
+          `🔄 Status: Creating preview...\n\n` +
+          `You'll receive the preview URL when ready.`,
+      );
+    } else {
+      await sendMessage(
+        chatId,
+        `❌ Failed to trigger demo deploy.\n\n` +
+          `Make sure GITHUB_TOKEN is configured.`,
+      );
+    }
+  },
+
+  // ==================== DEPLOYMENT COMMANDS ====================
 
   sites: async (chatId) => {
     await sendTyping(chatId);
@@ -250,7 +379,6 @@ const commands: Record<string, CommandHandler> = {
         return;
       }
 
-      // Get last 30 lines, limit to 3500 chars for Telegram
       const logText = logs.slice(-30).join("\n").slice(-3500);
 
       await sendMessage(
@@ -455,7 +583,6 @@ const commands: Record<string, CommandHandler> = {
 
       const deployments = await listDeployments(project.id, 5);
 
-      // Find the previous successful deployment
       const previousReady = deployments.find(
         (d, i) => i > 0 && d.state === "READY",
       );
@@ -564,7 +691,6 @@ export async function handleCommand(
   userId: number,
   text: string,
 ): Promise<void> {
-  // Security: Check if user is authorized
   const authorizedUsers =
     process.env.AUTHORIZED_TELEGRAM_IDS?.split(",").map(Number) || [];
 
@@ -573,7 +699,6 @@ export async function handleCommand(
     return;
   }
 
-  // Parse command
   if (!text.startsWith("/")) {
     await sendMessage(
       chatId,

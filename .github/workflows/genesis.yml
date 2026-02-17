@@ -1,0 +1,73 @@
+name: Genesis Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Project name to build'
+        required: true
+        type: string
+      chat_id:
+        description: 'Telegram chat ID for notifications'
+        required: true
+        type: string
+
+jobs:
+  genesis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Start
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "🚀 <b>Genesis Build Started</b>\n\nProject: <code>${{ inputs.project }}</code>\nStatus: Building...",
+              "parse_mode": "HTML"
+            }'
+
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ inputs.project }}
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Run build
+        run: npm run build
+        continue-on-error: true
+        id: build
+
+      - name: Run type check
+        run: npx tsc --noEmit
+        continue-on-error: true
+        id: typecheck
+
+      - name: Notify Success
+        if: steps.build.outcome == 'success' && steps.typecheck.outcome == 'success'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "✅ <b>Genesis Build Complete</b>\n\nProject: <code>${{ inputs.project }}</code>\n\n✓ Build passed\n✓ TypeScript passed\n\n🔗 <a href=\"https://github.com/Showowt/${{ inputs.project }}/actions\">View logs</a>",
+              "parse_mode": "HTML"
+            }'
+
+      - name: Notify Failure
+        if: steps.build.outcome == 'failure' || steps.typecheck.outcome == 'failure'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "❌ <b>Genesis Build Failed</b>\n\nProject: <code>${{ inputs.project }}</code>\n\nBuild: ${{ steps.build.outcome }}\nTypeScript: ${{ steps.typecheck.outcome }}\n\n🔗 <a href=\"https://github.com/Showowt/${{ inputs.project }}/actions\">View logs</a>",
+              "parse_mode": "HTML"
+            }'

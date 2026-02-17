@@ -1,0 +1,77 @@
+name: Demo Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Project name to demo'
+        required: true
+        type: string
+      chat_id:
+        description: 'Telegram chat ID for notifications'
+        required: true
+        type: string
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Start
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "🎬 <b>Demo Deploy Started</b>\n\nProject: <code>${{ inputs.project }}</code>\nCreating preview deployment...",
+              "parse_mode": "HTML"
+            }'
+
+      - name: Trigger Vercel Preview
+        id: deploy
+        run: |
+          # Trigger deployment via Vercel API
+          RESPONSE=$(curl -s -X POST "https://api.vercel.com/v13/deployments" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "${{ inputs.project }}",
+              "target": "preview",
+              "gitSource": {
+                "type": "github",
+                "repo": "Showowt/${{ inputs.project }}",
+                "ref": "main"
+              }
+            }')
+
+          URL=$(echo $RESPONSE | jq -r '.url // empty')
+          ID=$(echo $RESPONSE | jq -r '.id // empty')
+
+          if [ -n "$URL" ]; then
+            echo "url=$URL" >> $GITHUB_OUTPUT
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "error=$(echo $RESPONSE | jq -r '.error.message // "Unknown error"')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify Success
+        if: steps.deploy.outputs.success == 'true'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "🎬 <b>Demo Ready!</b>\n\nProject: <code>${{ inputs.project }}</code>\n\n🔗 Preview: https://${{ steps.deploy.outputs.url }}\n\n⏱️ Link expires in 24 hours",
+              "parse_mode": "HTML"
+            }'
+
+      - name: Notify Failure
+        if: steps.deploy.outputs.success == 'false'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "❌ <b>Demo Deploy Failed</b>\n\nProject: <code>${{ inputs.project }}</code>\nError: ${{ steps.deploy.outputs.error }}",
+              "parse_mode": "HTML"
+            }'

@@ -1,0 +1,109 @@
+name: Security Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Project name to audit'
+        required: true
+        type: string
+      chat_id:
+        description: 'Telegram chat ID for notifications'
+        required: true
+        type: string
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Start
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "🔍 <b>Security Audit Started</b>\n\nProject: <code>${{ inputs.project }}</code>\nScanning...",
+              "parse_mode": "HTML"
+            }'
+
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ inputs.project }}
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: NPM Audit
+        id: npm_audit
+        run: |
+          npm audit --json > audit-results.json 2>&1 || true
+          VULNS=$(cat audit-results.json | jq '.metadata.vulnerabilities | .low + .moderate + .high + .critical' 2>/dev/null || echo "0")
+          echo "vulnerabilities=$VULNS" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Check for secrets in code
+        id: secrets_check
+        run: |
+          # Check for common secret patterns
+          SECRETS_FOUND=$(grep -r -E "(api_key|apikey|secret|password|token).*=.*['\"][^'\"]{10,}" --include="*.ts" --include="*.tsx" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v ".env" | wc -l || echo "0")
+          echo "secrets_found=$SECRETS_FOUND" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Check .env.example exists
+        id: env_check
+        run: |
+          if [ -f ".env.example" ]; then
+            echo "env_example=true" >> $GITHUB_OUTPUT
+          else
+            echo "env_example=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: TypeScript strict check
+        id: ts_check
+        run: |
+          if grep -q '"strict": true' tsconfig.json 2>/dev/null; then
+            echo "strict=true" >> $GITHUB_OUTPUT
+          else
+            echo "strict=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Send Audit Report
+        run: |
+          VULNS="${{ steps.npm_audit.outputs.vulnerabilities }}"
+          SECRETS="${{ steps.secrets_check.outputs.secrets_found }}"
+          ENV_EXAMPLE="${{ steps.env_check.outputs.env_example }}"
+          TS_STRICT="${{ steps.ts_check.outputs.strict }}"
+
+          # Calculate score
+          SCORE=100
+          [ "$VULNS" != "0" ] && SCORE=$((SCORE - 20))
+          [ "$SECRETS" != "0" ] && SCORE=$((SCORE - 30))
+          [ "$ENV_EXAMPLE" = "false" ] && SCORE=$((SCORE - 10))
+          [ "$TS_STRICT" = "false" ] && SCORE=$((SCORE - 10))
+
+          if [ $SCORE -ge 80 ]; then
+            GRADE="A"
+            EMOJI="✅"
+          elif [ $SCORE -ge 60 ]; then
+            GRADE="B"
+            EMOJI="⚠️"
+          else
+            GRADE="C"
+            EMOJI="❌"
+          fi
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"chat_id\": \"${{ inputs.chat_id }}\",
+              \"text\": \"${EMOJI} <b>Security Audit Complete</b>\n\nProject: <code>${{ inputs.project }}</code>\nGrade: <b>${GRADE}</b> (${SCORE}/100)\n\n📦 NPM Vulnerabilities: ${VULNS}\n🔐 Hardcoded Secrets: ${SECRETS}\n📝 .env.example: ${ENV_EXAMPLE}\n🔒 TypeScript Strict: ${TS_STRICT}\n\n🔗 <a href=\\\"https://github.com/Showowt/${{ inputs.project }}/actions\\\">Full Report</a>\",
+              \"parse_mode\": \"HTML\"
+            }"
