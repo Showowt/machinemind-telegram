@@ -18,8 +18,6 @@ export async function sendMessage(
     parse_mode: options?.parse_mode || "HTML",
   };
 
-  console.log(`Sending message to ${chatId}: ${text.slice(0, 50)}...`);
-
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -28,12 +26,11 @@ export async function sendMessage(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Telegram API error: ${response.status} - ${errorText}`);
+    console.error(`Telegram API error: ${response.status}`);
     throw new Error(`Telegram API error: ${response.status} - ${errorText}`);
   }
 
   const result = await response.json();
-  console.log("Message sent successfully:", result.ok);
   return result.ok;
 }
 
@@ -41,11 +38,15 @@ export async function sendTyping(chatId: number | string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;
 
-  await fetch(`${TELEGRAM_API}${token}/sendChatAction`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, action: "typing" }),
-  });
+  try {
+    await fetch(`${TELEGRAM_API}${token}/sendChatAction`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, action: "typing" }),
+    });
+  } catch {
+    // Typing indicators are non-critical - swallow silently
+  }
 }
 
 export interface TelegramMessage {

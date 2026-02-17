@@ -67,10 +67,14 @@ async function vercelFetch<T>(
 }
 
 export async function listProjects(): Promise<VercelProject[]> {
-  const data = await vercelFetch<{ projects: VercelProject[] }>(
-    "/v9/projects?limit=50",
-  );
-  return data.projects;
+  try {
+    const data = await vercelFetch<{ projects: VercelProject[] }>(
+      "/v9/projects?limit=50",
+    );
+    return data.projects;
+  } catch {
+    return [];
+  }
 }
 
 export async function getProject(
@@ -87,10 +91,14 @@ export async function listDeployments(
   projectId: string,
   limit = 5,
 ): Promise<VercelDeployment[]> {
-  const data = await vercelFetch<{ deployments: VercelDeployment[] }>(
-    `/v6/deployments?projectId=${projectId}&limit=${limit}`,
-  );
-  return data.deployments;
+  try {
+    const data = await vercelFetch<{ deployments: VercelDeployment[] }>(
+      `/v6/deployments?projectId=${projectId}&limit=${limit}`,
+    );
+    return data.deployments;
+  } catch {
+    return [];
+  }
 }
 
 export async function getDeployment(

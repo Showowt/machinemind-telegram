@@ -380,13 +380,43 @@ const commands: Record<string, CommandHandler> = {
       businessName = args.slice(0, -1).join(" ");
     }
 
+    // Input validation - prevent injection attacks
+    if (!validateBusinessName(businessName)) {
+      await sendMessage(
+        chatId,
+        `❌ Invalid business name: <code>${businessName.slice(0, 50)}</code>\n\n` +
+          `Must be 1-100 characters, alphanumeric with spaces and basic punctuation.`,
+      );
+      return;
+    }
+
+    // Validate sector
+    const validSectors = [
+      "hospitality",
+      "restaurant",
+      "nightclub",
+      "yacht",
+      "villa",
+      "tour",
+      "hotel",
+      "spa",
+    ];
+    if (!validSectors.includes(sector.toLowerCase())) {
+      await sendMessage(
+        chatId,
+        `❌ Invalid sector: <code>${sector}</code>\n\n` +
+          `Valid sectors: ${validSectors.join(", ")}`,
+      );
+      return;
+    }
+
     const success = await triggerWorkflow(
       GITHUB_OWNER,
       BOT_REPO,
       "new-project.yml",
       {
         business_name: businessName,
-        sector: sector,
+        sector: sector.toLowerCase(),
         chat_id: String(chatId),
       },
     );
@@ -426,6 +456,16 @@ const commands: Record<string, CommandHandler> = {
 
     await sendTyping(chatId);
     const projectName = args[0];
+
+    // Input validation - prevent injection attacks
+    if (!validateProjectName(projectName)) {
+      await sendMessage(
+        chatId,
+        `❌ Invalid project name: <code>${projectName.slice(0, 50)}</code>\n\n` +
+          `Must be lowercase, alphanumeric with hyphens, max 100 characters.`,
+      );
+      return;
+    }
 
     // Check if repo exists on GitHub
     const exists = await repoExists(GITHUB_OWNER, projectName);
@@ -565,7 +605,10 @@ const commands: Record<string, CommandHandler> = {
         `🧩 <b>Component Generator</b>\n\n` +
           `Creates a new React component with ZDBS standards.\n\n` +
           `<b>Usage:</b> <code>/component [ComponentName] [project]</code>\n` +
-          `<b>Example:</b> <code>/component HeroSection simmer-down</code>`,
+          `<b>Example:</b> <code>/component HeroSection simmer-down</code>\n\n` +
+          `<b>Rules:</b>\n` +
+          `• Component: PascalCase (e.g., HeroSection)\n` +
+          `• Project: lowercase with hyphens (e.g., simmer-down)`,
       );
       return;
     }
@@ -573,6 +616,26 @@ const commands: Record<string, CommandHandler> = {
     await sendTyping(chatId);
     const componentName = args[0];
     const projectName = args[1];
+
+    // Input validation - prevent injection attacks
+    if (!validateComponentName(componentName)) {
+      await sendMessage(
+        chatId,
+        `❌ Invalid component name: <code>${componentName}</code>\n\n` +
+          `Must be PascalCase, alphanumeric, max 50 characters.\n` +
+          `Example: <code>HeroSection</code>, <code>ContactForm</code>`,
+      );
+      return;
+    }
+
+    if (!validateProjectName(projectName)) {
+      await sendMessage(
+        chatId,
+        `❌ Invalid project name: <code>${projectName}</code>\n\n` +
+          `Must be lowercase, alphanumeric with hyphens, max 100 characters.`,
+      );
+      return;
+    }
 
     const success = await triggerWorkflow(
       GITHUB_OWNER,
@@ -1156,15 +1219,43 @@ const commands: Record<string, CommandHandler> = {
   },
 };
 
+// Input validation patterns
+const SAFE_PROJECT_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/i;
+const SAFE_COMPONENT_NAME = /^[A-Z][A-Za-z0-9]{0,49}$/;
+const SAFE_BUSINESS_NAME = /^[A-Za-z0-9 '"áéíóúñÁÉÍÓÚÑüÜ,.\-]{1,100}$/;
+
+export function validateProjectName(name: string): boolean {
+  return SAFE_PROJECT_NAME.test(name);
+}
+
+export function validateComponentName(name: string): boolean {
+  return SAFE_COMPONENT_NAME.test(name);
+}
+
+export function validateBusinessName(name: string): boolean {
+  return SAFE_BUSINESS_NAME.test(name);
+}
+
 export async function handleCommand(
   chatId: number,
   userId: number,
   text: string,
 ): Promise<void> {
   const authorizedUsers =
-    process.env.AUTHORIZED_TELEGRAM_IDS?.split(",").map(Number) || [];
+    process.env.AUTHORIZED_TELEGRAM_IDS?.split(",")
+      .map(Number)
+      .filter(Boolean) || [];
 
-  if (authorizedUsers.length > 0 && !authorizedUsers.includes(userId)) {
+  // CRITICAL: Fail closed - if no authorized users configured, deny all
+  if (authorizedUsers.length === 0) {
+    console.error(
+      "AUTHORIZED_TELEGRAM_IDS not configured - denying all access",
+    );
+    await sendMessage(chatId, "⛔ Bot not configured. Contact administrator.");
+    return;
+  }
+
+  if (!authorizedUsers.includes(userId)) {
     await sendMessage(chatId, "⛔ Unauthorized. This bot is private.");
     return;
   }

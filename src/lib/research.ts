@@ -39,8 +39,6 @@ export interface BusinessResearch {
   rawData?: string;
 }
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-
 /**
  * Research a business using Claude to analyze web data
  */
@@ -73,8 +71,10 @@ async function callClaudeResearch(
   businessName: string,
   sector?: string,
 ): Promise<BusinessResearch> {
-  if (!ANTHROPIC_API_KEY) {
-    console.log("No ANTHROPIC_API_KEY, returning mock research");
+  // Read API key inline - not at module load time
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.warn("ANTHROPIC_API_KEY not configured - using mock research");
     return getMockResearch(businessName, sector);
   }
 
@@ -136,11 +136,11 @@ Return ONLY valid JSON, no markdown or explanations.`;
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929",
         max_tokens: 2000,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
@@ -148,18 +148,45 @@ Return ONLY valid JSON, no markdown or explanations.`;
     });
 
     if (!response.ok) {
-      console.error("Claude API error:", await response.text());
+      console.error("Claude API error: status", response.status);
       return getMockResearch(businessName, sector);
     }
 
-    const data = await response.json();
-    const content = data.content[0]?.text || "";
+    interface AnthropicResponse {
+      content: Array<{ type: string; text: string }>;
+      stop_reason: string;
+    }
 
-    // Parse JSON from response
+    const data = (await response.json()) as AnthropicResponse;
+    if (!data.content?.[0]?.text) {
+      console.error("Unexpected Anthropic API response structure");
+      return getMockResearch(businessName, sector);
+    }
+
+    const content = data.content[0].text;
+
+    // Parse JSON from response with defensive handling
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const research = JSON.parse(jsonMatch[0]) as BusinessResearch;
-      research.rawData = content;
+      const parsed = JSON.parse(jsonMatch[0]) as Partial<BusinessResearch>;
+      // Merge with defaults to ensure all fields exist
+      const research: BusinessResearch = {
+        name: parsed.name ?? businessName,
+        description: parsed.description ?? "",
+        sector: parsed.sector ?? sector ?? "hospitality",
+        location: parsed.location ?? { city: "Cartagena", country: "Colombia" },
+        contact: parsed.contact ?? {},
+        social: parsed.social ?? {},
+        features: parsed.features ?? [],
+        images: parsed.images ?? [],
+        reviews: { highlights: [], ...parsed.reviews },
+        competitors: parsed.competitors ?? [],
+        brandColors: parsed.brandColors ?? [],
+        keywords: parsed.keywords ?? [],
+        priceRange: parsed.priceRange,
+        hours: parsed.hours,
+        rawData: content,
+      };
       return research;
     }
 
