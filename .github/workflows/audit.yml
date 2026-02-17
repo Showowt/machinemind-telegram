@@ -1,19 +1,19 @@
-name: Security Audit
+name: Security Audit Swarm
 
 on:
   workflow_dispatch:
     inputs:
       project:
-        description: 'Project name to audit'
+        description: 'Project name'
         required: true
         type: string
       chat_id:
-        description: 'Telegram chat ID for notifications'
+        description: 'Telegram chat ID'
         required: true
         type: string
 
 jobs:
-  audit:
+  notify-start:
     runs-on: ubuntu-latest
     steps:
       - name: Notify Start
@@ -22,88 +22,139 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "chat_id": "${{ inputs.chat_id }}",
-              "text": "🔍 <b>Security Audit Started</b>\n\nProject: <code>${{ inputs.project }}</code>\nScanning...",
+              "text": "🔍 <b>Audit Swarm Activated</b>\n\n📦 Project: <code>${{ inputs.project }}</code>\n\n🔄 Spawning parallel agents:\n• Dependency Scanner\n• Secret Detector\n• Code Quality\n• ZDBS Validator",
               "parse_mode": "HTML"
             }'
 
-      - name: Checkout project
-        uses: actions/checkout@v4
+  dependencies:
+    runs-on: ubuntu-latest
+    outputs:
+      critical: ${{ steps.scan.outputs.critical }}
+      high: ${{ steps.scan.outputs.high }}
+    steps:
+      - uses: actions/checkout@v4
         with:
           repository: Showowt/${{ inputs.project }}
           token: ${{ secrets.GH_PAT }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci || npm install
-
-      - name: NPM Audit
-        id: npm_audit
+      - run: npm ci || npm install
+      - id: scan
         run: |
-          npm audit --json > audit-results.json 2>&1 || true
-          VULNS=$(cat audit-results.json | jq '.metadata.vulnerabilities | .low + .moderate + .high + .critical' 2>/dev/null || echo "0")
-          echo "vulnerabilities=$VULNS" >> $GITHUB_OUTPUT
+          RESULT=$(npm audit --json 2>/dev/null || echo '{}')
+          CRITICAL=$(echo "$RESULT" | jq '.metadata.vulnerabilities.critical // 0')
+          HIGH=$(echo "$RESULT" | jq '.metadata.vulnerabilities.high // 0')
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
         continue-on-error: true
 
-      - name: Check for secrets in code
-        id: secrets_check
+  secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      found: ${{ steps.scan.outputs.found }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ inputs.project }}
+          token: ${{ secrets.GH_PAT }}
+      - id: scan
         run: |
-          # Check for common secret patterns
-          SECRETS_FOUND=$(grep -r -E "(api_key|apikey|secret|password|token).*=.*['\"][^'\"]{10,}" --include="*.ts" --include="*.tsx" --include="*.js" . 2>/dev/null | grep -v node_modules | grep -v ".env" | wc -l || echo "0")
-          echo "secrets_found=$SECRETS_FOUND" >> $GITHUB_OUTPUT
+          # Scan for hardcoded secrets
+          FOUND=$(grep -rE "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][^'\"]{8,}" \
+            --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
+            . 2>/dev/null | grep -v node_modules | grep -v ".env" | wc -l | tr -d ' ')
+          echo "found=$FOUND" >> $GITHUB_OUTPUT
         continue-on-error: true
 
-      - name: Check .env.example exists
-        id: env_check
+  quality:
+    runs-on: ubuntu-latest
+    outputs:
+      todos: ${{ steps.scan.outputs.todos }}
+      any_types: ${{ steps.scan.outputs.any_types }}
+      console_logs: ${{ steps.scan.outputs.console_logs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ inputs.project }}
+          token: ${{ secrets.GH_PAT }}
+      - id: scan
         run: |
-          if [ -f ".env.example" ]; then
-            echo "env_example=true" >> $GITHUB_OUTPUT
-          else
-            echo "env_example=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: TypeScript strict check
-        id: ts_check
-        run: |
-          if grep -q '"strict": true' tsconfig.json 2>/dev/null; then
-            echo "strict=true" >> $GITHUB_OUTPUT
-          else
-            echo "strict=false" >> $GITHUB_OUTPUT
-          fi
+          TODOS=$(grep -rE "TODO|FIXME" --include="*.ts" --include="*.tsx" . 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
+          ANY_TYPES=$(grep -rE ": any" --include="*.ts" --include="*.tsx" . 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
+          CONSOLE_LOGS=$(grep -rE "console\.(log|debug)" --include="*.ts" --include="*.tsx" . 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
+          echo "todos=$TODOS" >> $GITHUB_OUTPUT
+          echo "any_types=$ANY_TYPES" >> $GITHUB_OUTPUT
+          echo "console_logs=$CONSOLE_LOGS" >> $GITHUB_OUTPUT
         continue-on-error: true
 
-      - name: Send Audit Report
+  zdbs:
+    runs-on: ubuntu-latest
+    outputs:
+      ts_strict: ${{ steps.scan.outputs.ts_strict }}
+      env_example: ${{ steps.scan.outputs.env_example }}
+      error_boundary: ${{ steps.scan.outputs.error_boundary }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ inputs.project }}
+          token: ${{ secrets.GH_PAT }}
+      - id: scan
         run: |
-          VULNS="${{ steps.npm_audit.outputs.vulnerabilities }}"
-          SECRETS="${{ steps.secrets_check.outputs.secrets_found }}"
-          ENV_EXAMPLE="${{ steps.env_check.outputs.env_example }}"
-          TS_STRICT="${{ steps.ts_check.outputs.strict }}"
+          TS_STRICT=$(grep -q '"strict": true' tsconfig.json 2>/dev/null && echo "true" || echo "false")
+          ENV_EXAMPLE=$([[ -f ".env.example" ]] && echo "true" || echo "false")
+          ERROR_BOUNDARY=$(grep -r "error.tsx" app/ 2>/dev/null | wc -l | tr -d ' ')
+          echo "ts_strict=$TS_STRICT" >> $GITHUB_OUTPUT
+          echo "env_example=$ENV_EXAMPLE" >> $GITHUB_OUTPUT
+          echo "error_boundary=$ERROR_BOUNDARY" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+  report:
+    needs: [dependencies, secrets, quality, zdbs]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Calculate Score & Report
+        run: |
+          CRITICAL="${{ needs.dependencies.outputs.critical }}"
+          HIGH="${{ needs.dependencies.outputs.high }}"
+          SECRETS="${{ needs.secrets.outputs.found }}"
+          TODOS="${{ needs.quality.outputs.todos }}"
+          ANY_TYPES="${{ needs.quality.outputs.any_types }}"
+          CONSOLE_LOGS="${{ needs.quality.outputs.console_logs }}"
+          TS_STRICT="${{ needs.zdbs.outputs.ts_strict }}"
+          ENV_EXAMPLE="${{ needs.zdbs.outputs.env_example }}"
 
           # Calculate score
           SCORE=100
-          [ "$VULNS" != "0" ] && SCORE=$((SCORE - 20))
-          [ "$SECRETS" != "0" ] && SCORE=$((SCORE - 30))
-          [ "$ENV_EXAMPLE" = "false" ] && SCORE=$((SCORE - 10))
-          [ "$TS_STRICT" = "false" ] && SCORE=$((SCORE - 10))
+          [[ "$CRITICAL" -gt 0 ]] && SCORE=$((SCORE - 30))
+          [[ "$HIGH" -gt 0 ]] && SCORE=$((SCORE - 15))
+          [[ "$SECRETS" -gt 0 ]] && SCORE=$((SCORE - 25))
+          [[ "$TODOS" -gt 5 ]] && SCORE=$((SCORE - 5))
+          [[ "$ANY_TYPES" -gt 3 ]] && SCORE=$((SCORE - 10))
+          [[ "$TS_STRICT" != "true" ]] && SCORE=$((SCORE - 10))
+          [[ "$ENV_EXAMPLE" != "true" ]] && SCORE=$((SCORE - 5))
 
-          if [ $SCORE -ge 80 ]; then
-            GRADE="A"
-            EMOJI="✅"
-          elif [ $SCORE -ge 60 ]; then
-            GRADE="B"
-            EMOJI="⚠️"
-          else
-            GRADE="C"
-            EMOJI="❌"
-          fi
+          # Grade
+          if [[ $SCORE -ge 90 ]]; then GRADE="A+"; EMOJI="🏆";
+          elif [[ $SCORE -ge 80 ]]; then GRADE="A"; EMOJI="✅";
+          elif [[ $SCORE -ge 70 ]]; then GRADE="B"; EMOJI="⚠️";
+          elif [[ $SCORE -ge 60 ]]; then GRADE="C"; EMOJI="⚠️";
+          else GRADE="F"; EMOJI="❌"; fi
+
+          # Icons
+          CRIT_ICON=$([[ "$CRITICAL" == "0" ]] && echo "✅" || echo "🔴 $CRITICAL")
+          HIGH_ICON=$([[ "$HIGH" == "0" ]] && echo "✅" || echo "🟠 $HIGH")
+          SEC_ICON=$([[ "$SECRETS" == "0" ]] && echo "✅" || echo "🔴 $SECRETS found")
+          TODO_ICON=$([[ "$TODOS" -le 5 ]] && echo "✅ $TODOS" || echo "⚠️ $TODOS")
+          ANY_ICON=$([[ "$ANY_TYPES" -le 3 ]] && echo "✅ $ANY_TYPES" || echo "⚠️ $ANY_TYPES")
+          STRICT_ICON=$([[ "$TS_STRICT" == "true" ]] && echo "✅" || echo "❌")
+          ENV_ICON=$([[ "$ENV_EXAMPLE" == "true" ]] && echo "✅" || echo "❌")
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -H "Content-Type: application/json" \
             -d "{
               \"chat_id\": \"${{ inputs.chat_id }}\",
-              \"text\": \"${EMOJI} <b>Security Audit Complete</b>\n\nProject: <code>${{ inputs.project }}</code>\nGrade: <b>${GRADE}</b> (${SCORE}/100)\n\n📦 NPM Vulnerabilities: ${VULNS}\n🔐 Hardcoded Secrets: ${SECRETS}\n📝 .env.example: ${ENV_EXAMPLE}\n🔒 TypeScript Strict: ${TS_STRICT}\n\n🔗 <a href=\\\"https://github.com/Showowt/${{ inputs.project }}/actions\\\">Full Report</a>\",
+              \"text\": \"$EMOJI <b>Audit Complete: Grade $GRADE ($SCORE/100)</b>\n\n📦 Project: <code>${{ inputs.project }}</code>\n\n<b>🛡️ Security:</b>\n$CRIT_ICON Critical vulns\n$HIGH_ICON High vulns\n$SEC_ICON Hardcoded secrets\n\n<b>📊 Quality:</b>\n$TODO_ICON TODOs\n$ANY_ICON any types\n\n<b>⚡ ZDBS:</b>\n$STRICT_ICON TypeScript strict\n$ENV_ICON .env.example\n\n🔗 <a href=\\\"https://github.com/Showowt/${{ inputs.project }}/actions\\\">Details</a>\",
               \"parse_mode\": \"HTML\"
             }"
