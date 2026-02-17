@@ -6,19 +6,35 @@ export async function sendMessage(
   options?: { parse_mode?: "HTML" | "Markdown" },
 ): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) throw new Error("TELEGRAM_BOT_TOKEN not set");
+  if (!token) {
+    console.error("TELEGRAM_BOT_TOKEN not set");
+    throw new Error("TELEGRAM_BOT_TOKEN not set");
+  }
 
-  const response = await fetch(`${TELEGRAM_API}${token}/sendMessage`, {
+  const url = `${TELEGRAM_API}${token}/sendMessage`;
+  const body = {
+    chat_id: chatId,
+    text,
+    parse_mode: options?.parse_mode || "HTML",
+  };
+
+  console.log(`Sending message to ${chatId}: ${text.slice(0, 50)}...`);
+
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: options?.parse_mode || "HTML",
-    }),
+    body: JSON.stringify(body),
   });
 
-  return response.ok;
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Telegram API error: ${response.status} - ${errorText}`);
+    throw new Error(`Telegram API error: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log("Message sent successfully:", result.ok);
+  return result.ok;
 }
 
 export async function sendTyping(chatId: number | string): Promise<void> {
