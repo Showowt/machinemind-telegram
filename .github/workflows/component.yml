@@ -1,0 +1,89 @@
+name: Component Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      component_name:
+        description: 'Component name to generate'
+        required: true
+        type: string
+      project:
+        description: 'Project to add component to'
+        required: true
+        type: string
+      chat_id:
+        description: 'Telegram chat ID for notifications'
+        required: true
+        type: string
+
+jobs:
+  component:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Start
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "🧩 <b>Component Generator Started</b>\n\nComponent: <code>${{ inputs.component_name }}</code>\nProject: <code>${{ inputs.project }}</code>",
+              "parse_mode": "HTML"
+            }'
+
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ inputs.project }}
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate Component
+        id: generate
+        run: |
+          COMPONENT_NAME="${{ inputs.component_name }}"
+          COMPONENT_DIR="components"
+
+          # Create components directory if it doesn't exist
+          mkdir -p $COMPONENT_DIR
+
+          # Generate component file
+          cat > "$COMPONENT_DIR/${COMPONENT_NAME}.tsx" << 'COMPONENT_EOF'
+          "use client";
+
+          interface ${{ inputs.component_name }}Props {
+            className?: string;
+          }
+
+          export function ${{ inputs.component_name }}({ className }: ${{ inputs.component_name }}Props) {
+            return (
+              <div className={className}>
+                <h2>${{ inputs.component_name }}</h2>
+                {/* TODO: Implement component */}
+              </div>
+            );
+          }
+          COMPONENT_EOF
+
+          echo "file=$COMPONENT_DIR/${COMPONENT_NAME}.tsx" >> $GITHUB_OUTPUT
+
+      - name: Commit and Push
+        run: |
+          git config user.name "MachineMind Bot"
+          git config user.email "bot@machinemind.ai"
+          git add .
+          git commit -m "feat: add ${{ inputs.component_name }} component [bot]" || echo "No changes"
+          git push
+
+      - name: Notify Success
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "✅ <b>Component Created!</b>\n\n🧩 Component: <code>${{ inputs.component_name }}</code>\n📁 File: <code>${{ steps.generate.outputs.file }}</code>\n📦 Project: <code>${{ inputs.project }}</code>\n\n🔗 <a href=\"https://github.com/Showowt/${{ inputs.project }}/blob/main/${{ steps.generate.outputs.file }}\">View on GitHub</a>",
+              "parse_mode": "HTML"
+            }'

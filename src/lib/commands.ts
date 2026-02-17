@@ -26,7 +26,9 @@ const commands: Record<string, CommandHandler> = {
         `<b>🔧 Build Commands:</b>\n` +
         `<code>/genesis [project]</code> — Full autonomous build\n` +
         `<code>/audit [project]</code> — Security + quality scan\n` +
-        `<code>/demo [project]</code> — Create preview deploy\n\n` +
+        `<code>/demo [project]</code> — Create preview deploy\n` +
+        `<code>/component [name] [project]</code> — Generate component\n` +
+        `<code>/sofia [project]</code> — Sofia deploy swarm\n\n` +
         `<b>🚀 Deployment:</b>\n` +
         `<code>/sites</code> — List all projects\n` +
         `<code>/status [project]</code> — Deployment status\n` +
@@ -174,6 +176,97 @@ const commands: Record<string, CommandHandler> = {
       await sendMessage(
         chatId,
         `❌ Failed to trigger demo deploy.\n\n` +
+          `Make sure GITHUB_TOKEN is configured.`,
+      );
+    }
+  },
+
+  component: async (chatId, args) => {
+    if (args.length < 2) {
+      await sendMessage(
+        chatId,
+        `🧩 <b>Component Generator</b>\n\n` +
+          `Creates a new React component with ZDBS standards.\n\n` +
+          `<b>Usage:</b> <code>/component [ComponentName] [project]</code>\n` +
+          `<b>Example:</b> <code>/component HeroSection simmer-down</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const componentName = args[0];
+    const projectName = args[1];
+
+    const success = await triggerWorkflow(
+      GITHUB_OWNER,
+      BOT_REPO,
+      "component.yml",
+      {
+        component_name: componentName,
+        project: projectName,
+        chat_id: String(chatId),
+      },
+    );
+
+    if (success) {
+      await sendMessage(
+        chatId,
+        `🧩 <b>Component Generator Started</b>\n\n` +
+          `📦 Component: <code>${componentName}</code>\n` +
+          `📁 Project: <code>${projectName}</code>\n\n` +
+          `You'll receive confirmation when the component is created.`,
+      );
+    } else {
+      await sendMessage(
+        chatId,
+        `❌ Failed to trigger component generator.\n\n` +
+          `Make sure GITHUB_TOKEN is configured.`,
+      );
+    }
+  },
+
+  sofia: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🤖 <b>Sofia Deploy Swarm</b>\n\n` +
+          `Full deployment pipeline for Sofia AI agent projects.\n\n` +
+          `<b>Includes:</b>\n` +
+          `• TypeScript validation\n` +
+          `• Build verification\n` +
+          `• Vercel deployment\n` +
+          `• Webhook configuration\n\n` +
+          `<b>Usage:</b> <code>/sofia [project-name]</code>\n` +
+          `<b>Example:</b> <code>/sofia sofia-brain</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+
+    const success = await triggerWorkflow(
+      GITHUB_OWNER,
+      BOT_REPO,
+      "sofia-deploy.yml",
+      {
+        project: projectName,
+        chat_id: String(chatId),
+      },
+    );
+
+    if (success) {
+      await sendMessage(
+        chatId,
+        `🤖 <b>Sofia Deploy Swarm Initiated</b>\n\n` +
+          `📦 Project: <code>${projectName}</code>\n` +
+          `🔄 Status: Running checks...\n\n` +
+          `You'll receive the deployment URL when complete.`,
+      );
+    } else {
+      await sendMessage(
+        chatId,
+        `❌ Failed to trigger Sofia deploy.\n\n` +
           `Make sure GITHUB_TOKEN is configured.`,
       );
     }

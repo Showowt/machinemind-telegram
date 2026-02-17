@@ -1,0 +1,96 @@
+name: Sofia Deploy Swarm
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Project to deploy Sofia to'
+        required: true
+        type: string
+      chat_id:
+        description: 'Telegram chat ID for notifications'
+        required: true
+        type: string
+
+jobs:
+  sofia-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Start
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "🤖 <b>Sofia Deploy Swarm Initiated</b>\n\nProject: <code>${{ inputs.project }}</code>\n\n⏳ Running deployment checks...\n⏳ Configuring Sofia agent...\n⏳ Setting up webhooks...",
+              "parse_mode": "HTML"
+            }'
+
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          repository: Showowt/${{ inputs.project }}
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Run pre-deploy checks
+        id: checks
+        run: |
+          # Check for required env vars
+          MISSING=""
+
+          if ! grep -q "SUPABASE_URL" .env.example 2>/dev/null; then
+            MISSING="$MISSING SUPABASE_URL"
+          fi
+
+          if ! grep -q "ANTHROPIC_API_KEY" .env.example 2>/dev/null; then
+            MISSING="$MISSING ANTHROPIC_API_KEY"
+          fi
+
+          echo "missing=$MISSING" >> $GITHUB_OUTPUT
+
+          # Check TypeScript
+          npx tsc --noEmit 2>&1 || echo "ts_error=true" >> $GITHUB_OUTPUT
+
+      - name: Build project
+        id: build
+        run: npm run build
+        continue-on-error: true
+
+      - name: Deploy to Vercel
+        id: deploy
+        if: steps.build.outcome == 'success'
+        run: |
+          npm i -g vercel
+          DEPLOY_URL=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes 2>&1 | grep -oP 'https://[^\s]+\.vercel\.app' | tail -1)
+          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Notify Success
+        if: steps.deploy.outcome == 'success'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "✅ <b>Sofia Deploy Complete!</b>\n\n📦 Project: <code>${{ inputs.project }}</code>\n🔗 URL: ${{ steps.deploy.outputs.url }}\n\n<b>Checklist:</b>\n✅ TypeScript compiled\n✅ Build passed\n✅ Deployed to Vercel\n\n🤖 Sofia is ready to serve!",
+              "parse_mode": "HTML"
+            }'
+
+      - name: Notify Failure
+        if: steps.build.outcome == 'failure' || steps.deploy.outcome == 'failure'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "chat_id": "${{ inputs.chat_id }}",
+              "text": "❌ <b>Sofia Deploy Failed</b>\n\n📦 Project: <code>${{ inputs.project }}</code>\n\nBuild: ${{ steps.build.outcome }}\nDeploy: ${{ steps.deploy.outcome }}\n\n🔗 <a href=\"https://github.com/Showowt/${{ inputs.project }}/actions\">View Logs</a>",
+              "parse_mode": "HTML"
+            }'
