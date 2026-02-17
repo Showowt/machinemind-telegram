@@ -604,6 +604,152 @@ jobs:
           export const supabase = createClient(supabaseUrl, supabaseAnonKey);
           EOF
 
+          # =====================================================
+          # SIGNATURE EXPERIENCE COMPONENTS (Engine Protocols v3)
+          # =====================================================
+
+          # components/ScrollProgress.tsx - Micro-interaction signature
+          cat > components/ScrollProgress.tsx << 'EOF'
+          "use client";
+
+          import { useEffect, useState } from "react";
+
+          export function ScrollProgress() {
+            const [progress, setProgress] = useState(0);
+
+            useEffect(() => {
+              const updateProgress = () => {
+                const scrollTop = window.scrollY;
+                const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                const scrollPercent = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+                setProgress(scrollPercent);
+              };
+
+              window.addEventListener("scroll", updateProgress, { passive: true });
+              return () => window.removeEventListener("scroll", updateProgress);
+            }, []);
+
+            return (
+              <div
+                className="fixed top-0 left-0 h-1 bg-gold z-[100] transition-all duration-150"
+                style={{ width: `${progress}%` }}
+                aria-hidden="true"
+              />
+            );
+          }
+          EOF
+
+          # components/ConsoleEasterEgg.tsx - Easter egg signature
+          cat > components/ConsoleEasterEgg.tsx << 'EGGEOF'
+          "use client";
+
+          import { useEffect } from "react";
+
+          export function ConsoleEasterEgg() {
+            useEffect(() => {
+              const styles = [
+                "color: #d4af37",
+                "font-size: 20px",
+                "font-weight: bold",
+                "text-shadow: 2px 2px 4px rgba(0,0,0,0.3)",
+              ].join(";");
+
+              console.log("%c⚡ GENESIS ENGINE", styles);
+              console.log(
+                "%cPowered by MachineMind | APEX v6 | PROMETHEUS v2",
+                "color: #888; font-style: italic;"
+              );
+              console.log(
+                "%c🔥 Looking to build something amazing? Contact us!",
+                "color: #d4af37;"
+              );
+
+              // Add secret menu to window object
+              if (typeof window !== "undefined") {
+                (window as unknown as Record<string, unknown>).MachineMind = {
+                  version: "Genesis v3",
+                  contact: "hello@machinemind.ai",
+                  secretMenu: () => {
+                    console.log("%c🎉 You found the secret menu!", "color: #ff00ff; font-size: 16px;");
+                    console.log("Available commands:");
+                    console.log("  - MachineMind.version");
+                    console.log("  - MachineMind.contact");
+                    return "✨ You're curious - we like that!";
+                  },
+                };
+              }
+            }, []);
+
+            return null;
+          }
+          EGGEOF
+
+          # components/WhatsAppFloat.tsx - Signature CTA component
+          cat > components/WhatsAppFloat.tsx << 'EOF'
+          "use client";
+
+          import { MessageCircle } from "lucide-react";
+
+          interface WhatsAppFloatProps {
+            phone?: string;
+            message?: string;
+          }
+
+          export function WhatsAppFloat({
+            phone = "573001234567",
+            message = "Hola, me gustaría más información",
+          }: WhatsAppFloatProps) {
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`;
+
+            return (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="fixed bottom-6 right-6 w-16 h-16 bg-green-500 flex items-center justify-center hover:bg-green-600 transition-all duration-300 hover:scale-105 shadow-lg z-50"
+                aria-label="Contactar por WhatsApp"
+              >
+                <MessageCircle size={32} className="text-white" />
+              </a>
+            );
+          }
+          EOF
+
+          # Update app/layout.tsx to include signature components
+          cat > app/layout.tsx << LAYOUTEOF
+          import type { Metadata } from "next";
+          import { ScrollProgress } from "@/components/ScrollProgress";
+          import { ConsoleEasterEgg } from "@/components/ConsoleEasterEgg";
+          import "./globals.css";
+
+          export const metadata: Metadata = {
+            title: "${BUSINESS}",
+            description: "${BUSINESS} - ${HERO_SUB}",
+            openGraph: {
+              title: "${BUSINESS}",
+              description: "${HERO_SUB}",
+              type: "website",
+            },
+          };
+
+          export default function RootLayout({
+            children,
+          }: {
+            children: React.ReactNode;
+          }) {
+            return (
+              <html lang="es">
+                <body className="antialiased">
+                  <ScrollProgress />
+                  <ConsoleEasterEgg />
+                  {children}
+                </body>
+              </html>
+            );
+          }
+          LAYOUTEOF
+
       - name: Commit Project
         working-directory: project
         run: |
@@ -612,11 +758,17 @@ jobs:
           git add -A
           git commit -m "⚡ Genesis Build: ${{ inputs.business_name }} (${{ inputs.sector }})
 
-          Built with PROMETHEUS v2 + APEX v6
+          Built with ENGINE PROTOCOLS v3:
+          - APEX FINISHING ENGINE (12 dimensions)
+          - INTERFACE PERFECTION ENGINE (no rounded corners)
+          - SIGNATURE EXPERIENCE ENGINE (scroll progress, easter eggs)
+
+          Stack: PROMETHEUS v2 + APEX v6
           - Sector-specific Spanish content
-          - Luxury APEX theme (gold accents, Playfair Display)
-          - WhatsApp integration
-          - Mobile-first responsive design
+          - Luxury APEX theme (gold #d4af37, Playfair Display)
+          - WhatsApp integration + floating CTA
+          - Mobile-first responsive (56px touch targets)
+          - ZDBS quality standards
           "
           git push
 
@@ -667,7 +819,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{
               \"chat_id\": \"${{ inputs.chat_id }}\",
-              \"text\": \"⚡ <b>GENESIS COMPLETE: $STATUS</b>\n\n🏢 <b>${{ inputs.business_name }}</b>\n🎯 Sector: ${{ inputs.sector }}\n📍 Location: ${{ inputs.location }}\n\n<b>🔗 Resources:</b>\n📁 <a href=\\\"https://github.com/Showowt/$REPO\\\">GitHub Repo</a>\n🌐 <a href=\\\"$URL\\\">Live Site</a>\n\n<b>✨ Genesis Features:</b>\n• APEX luxury theme\n• Spanish content (sector-specific)\n• WhatsApp integration\n• Mobile-first design\n• Playfair Display typography\n• Gold accent palette\n\n<b>🚀 Next:</b>\n<code>/audit $REPO</code> - Run security scan\",
+              \"text\": \"⚡ <b>GENESIS COMPLETE: $STATUS</b>\n\n🏢 <b>${{ inputs.business_name }}</b>\n🎯 Sector: ${{ inputs.sector }}\n📍 Location: ${{ inputs.location }}\n\n<b>🔗 Resources:</b>\n📁 <a href=\\\"https://github.com/Showowt/$REPO\\\">GitHub Repo</a>\n🌐 <a href=\\\"$URL\\\">Live Site</a>\n\n<b>⚡ ENGINE PROTOCOLS v3:</b>\n• APEX FINISHING (12 dimensions)\n• INTERFACE PERFECTION (no corners)\n• SIGNATURE EXPERIENCES included\n\n<b>✨ Genesis Features:</b>\n• Scroll progress indicator\n• Console easter eggs\n• WhatsApp floating CTA\n• 56px touch targets\n• WCAG 4.5:1 contrast\n• Spanish sector content\n\n<b>🚀 Next:</b>\n<code>/audit $REPO</code> - Run security scan\",
               \"parse_mode\": \"HTML\",
               \"disable_web_page_preview\": true
             }"
