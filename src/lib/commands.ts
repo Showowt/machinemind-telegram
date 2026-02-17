@@ -16,6 +16,40 @@ import { triggerWorkflow } from "./github";
 const GITHUB_OWNER = "Showowt";
 const BOT_REPO = "machinemind-telegram";
 
+/**
+ * Extract project name from URL or return as-is
+ * Handles:
+ * - https://project-name.vercel.app → project-name
+ * - https://project-name-abc123-team.vercel.app → project-name
+ * - https://github.com/owner/repo → repo
+ * - project-name → project-name
+ */
+function extractProjectName(input: string): string {
+  // Vercel URL: https://project-name.vercel.app or deployment URLs
+  const vercelMatch = input.match(
+    /https?:\/\/([a-z0-9-]+?)(?:-[a-z0-9]{8,})?(?:-[a-z0-9-]+)?\.vercel\.app/i,
+  );
+  if (vercelMatch) {
+    return vercelMatch[1];
+  }
+
+  // GitHub URL: https://github.com/owner/repo
+  const githubMatch = input.match(/https?:\/\/github\.com\/[^/]+\/([^/\s]+)/i);
+  if (githubMatch) {
+    return githubMatch[1].replace(/\.git$/, "");
+  }
+
+  // Already a project name
+  return input;
+}
+
+/**
+ * Clean all args by extracting project names from URLs
+ */
+function cleanArgs(args: string[]): string[] {
+  return args.map((arg) => extractProjectName(arg));
+}
+
 type CommandHandler = (chatId: number, args: string[]) => Promise<void>;
 
 const commands: Record<string, CommandHandler> = {
@@ -875,7 +909,7 @@ export async function handleCommand(
 
   const parts = text.slice(1).split(/\s+/);
   const command = parts[0].toLowerCase().split("@")[0];
-  const args = parts.slice(1);
+  const args = cleanArgs(parts.slice(1));
 
   const handler = commands[command];
 
