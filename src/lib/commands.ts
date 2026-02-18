@@ -11,12 +11,7 @@ import {
   promoteDeployment,
   cancelDeployment,
 } from "./vercel";
-import {
-  triggerWorkflow,
-  listReposDetailed,
-  repoExists,
-  createRepo,
-} from "./github";
+import { triggerWorkflow, listReposDetailed, repoExists } from "./github";
 import {
   researchBusiness,
   formatResearchForTelegram,
@@ -28,6 +23,43 @@ import {
   generateBuildPrompt,
   SECTOR_TEMPLATES,
 } from "./genesis-engine";
+// Elite tier imports
+import {
+  analyzeAndFix,
+  reviewCode,
+  optimizeProject,
+  chatAboutProject,
+} from "./ai-operations";
+import {
+  calculateROI,
+  generatePitch,
+  generateProposal,
+  analyzeCompetitors,
+  formatROIForTelegram,
+  formatPitchForTelegram,
+  formatProposalForTelegram,
+} from "./client-acquisition";
+import {
+  runSpeedTest,
+  checkSEO,
+  checkUptime,
+  formatSpeedForTelegram,
+  formatSEOForTelegram,
+  formatUptimeForTelegram,
+} from "./analytics";
+import {
+  generateCopy,
+  translateText,
+  generateImagePrompt,
+  formatCopyForTelegram,
+  formatTranslationForTelegram,
+} from "./content-generation";
+import {
+  cloneProject,
+  setEnvVar,
+  addDomain,
+  getPreviewUrl,
+} from "./advanced-deploy";
 
 const GITHUB_OWNER = "Showowt";
 const BOT_REPO = "machinemind-telegram";
@@ -72,33 +104,62 @@ const commands: Record<string, CommandHandler> = {
   start: async (chatId) => {
     await sendMessage(
       chatId,
-      `🚀 <b>MachineMind Command Center</b>\n\n` +
+      `🚀 <b>MachineMind Command Center v2</b>\n\n` +
         `<b>⚡ GENESIS ENGINE:</b>\n` +
-        `<code>/build [business] [sector]</code> — Full masterpiece build\n` +
-        `<code>/research [business]</code> — Scrape business intel\n\n` +
-        `<b>🏗️ Create:</b>\n` +
-        `<code>/new [business] [sector]</code> — Create project\n\n` +
-        `<b>📦 GitHub:</b>\n` +
-        `<code>/repos</code> — List GitHub repos\n\n` +
+        `<code>/build</code> — Full masterpiece build\n` +
+        `<code>/research</code> — Scrape business intel\n` +
+        `<code>/new</code> — Create new project\n\n` +
+        `<b>🧠 AI-POWERED:</b>\n` +
+        `<code>/fix</code> — AI error diagnosis\n` +
+        `<code>/review</code> — AI code review\n` +
+        `<code>/optimize</code> — Performance suggestions\n` +
+        `<code>/chat</code> — Ask Claude anything\n\n` +
+        `<b>💰 CLIENT ACQUISITION:</b>\n` +
+        `<code>/pitch</code> — Generate sales pitch\n` +
+        `<code>/roi</code> — ROI calculator\n` +
+        `<code>/proposal</code> — Full proposal\n` +
+        `<code>/competitor</code> — Competitor analysis\n\n` +
+        `<b>📊 ANALYTICS:</b>\n` +
+        `<code>/speed</code> — Core Web Vitals\n` +
+        `<code>/seo</code> — SEO audit\n` +
+        `<code>/uptime</code> — Uptime check\n\n` +
+        `<b>✍️ CONTENT:</b>\n` +
+        `<code>/copy</code> — Generate copy\n` +
+        `<code>/translate</code> — ES ↔ EN\n` +
+        `<code>/image</code> — Image prompts\n\n` +
+        `<b>🚀 DEPLOY:</b>\n` +
+        `<code>/sites</code> — List projects\n` +
+        `<code>/status</code> — Deployment status\n` +
+        `<code>/deploy</code> — Deploy to prod\n` +
+        `<code>/clone</code> — Clone project\n` +
+        `<code>/env-set</code> — Set env var\n` +
+        `<code>/domain-add</code> — Add domain\n\n` +
+        `💡 <code>/help2</code> for full command list`,
+    );
+  },
+
+  help2: async (chatId) => {
+    await sendMessage(
+      chatId,
+      `📖 <b>Full Command Reference</b>\n\n` +
         `<b>🔧 CI/CD:</b>\n` +
-        `<code>/genesis [project]</code> — Run build checks\n` +
-        `<code>/audit [project]</code> — Security + quality scan\n` +
-        `<code>/demo [project]</code> — Create preview deploy\n` +
-        `<code>/component [name] [project]</code> — Generate component\n` +
-        `<code>/sofia [project]</code> — Sofia deploy swarm\n\n` +
-        `<b>🚀 Deploy:</b>\n` +
-        `<code>/sites</code> — List all projects\n` +
-        `<code>/status [project]</code> — Deployment status\n` +
-        `<code>/deploy [project]</code> — Deploy to production\n` +
+        `<code>/genesis [project]</code> — Build checks\n` +
+        `<code>/audit [project]</code> — Security scan\n` +
+        `<code>/demo [project]</code> — Preview deploy\n` +
+        `<code>/component [name] [project]</code> — Component\n` +
+        `<code>/sofia [project]</code> — Sofia deploy\n\n` +
+        `<b>📦 GitHub:</b>\n` +
+        `<code>/repos</code> — List repos\n\n` +
+        `<b>🚀 Deployment:</b>\n` +
         `<code>/logs [project]</code> — Build logs\n` +
         `<code>/errors [project]</code> — Runtime errors\n` +
         `<code>/rollback [project]</code> — Rollback\n` +
-        `<code>/cancel [project]</code> — Cancel build\n\n` +
+        `<code>/cancel [project]</code> — Cancel build\n` +
+        `<code>/preview [project] [branch]</code> — Preview URL\n\n` +
         `<b>📊 Info:</b>\n` +
         `<code>/domains [project]</code> — Domains\n` +
         `<code>/env [project]</code> — Env vars\n` +
-        `<code>/ping</code> — Health check\n\n` +
-        `💡 <code>/research "Alquimico" nightclub</code>`,
+        `<code>/ping</code> — Health check`,
     );
   },
 
@@ -1216,6 +1277,656 @@ const commands: Record<string, CommandHandler> = {
         `❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
+  },
+
+  // ==================== AI-POWERED COMMANDS ====================
+
+  fix: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🔧 <b>AI Fix</b>\n\n` +
+          `Analyzes errors and suggests fixes using Claude AI.\n\n` +
+          `<b>Usage:</b> <code>/fix [project-name]</code>\n` +
+          `<b>Example:</b> <code>/fix simmer-down</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+    await sendMessage(
+      chatId,
+      `🔍 Analyzing errors for <code>${projectName}</code>...`,
+    );
+
+    try {
+      const project = await getProject(projectName);
+      if (!project) {
+        await sendMessage(
+          chatId,
+          `❌ Project <code>${projectName}</code> not found.`,
+        );
+        return;
+      }
+
+      const deployments = await listDeployments(project.id, 1);
+      const errorLogs = await getRuntimeLogs(project.id, {
+        level: "error",
+        limit: 10,
+      });
+      const buildLogs =
+        deployments.length > 0
+          ? await getDeploymentLogs(deployments[0].id)
+          : [];
+
+      const result = await analyzeAndFix(
+        projectName,
+        errorLogs.map((l) => l.message),
+        buildLogs,
+      );
+
+      if (!result.success) {
+        await sendMessage(chatId, `❌ ${result.error}`);
+        return;
+      }
+
+      const fixes = result.fixes?.join("\n\n") || "No specific fix identified";
+      const recommendations = result.recommendations?.join("\n") || "";
+
+      await sendMessage(
+        chatId,
+        `🔧 <b>AI FIX ANALYSIS: ${projectName}</b>\n\n` +
+          `<b>Root Cause:</b>\n${result.analysis || "No errors detected"}\n\n` +
+          `<b>Fix:</b>\n<pre>${fixes}</pre>\n\n` +
+          `${recommendations ? `<b>Prevention:</b>\n${recommendations}` : ""}`,
+      );
+    } catch (error) {
+      await sendMessage(
+        chatId,
+        `❌ Error: ${error instanceof Error ? error.message : "Unknown"}`,
+      );
+    }
+  },
+
+  review: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `📝 <b>AI Code Review</b>\n\n` +
+          `AI-powered code review with recommendations.\n\n` +
+          `<b>Usage:</b> <code>/review [project-name]</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+    await sendMessage(
+      chatId,
+      `📝 Reviewing code for <code>${projectName}</code>...`,
+    );
+
+    try {
+      const result = await reviewCode(projectName, [], {});
+
+      if (!result.success) {
+        await sendMessage(chatId, `❌ ${result.error}`);
+        return;
+      }
+
+      const recs = result.recommendations.slice(0, 5).join("\n");
+
+      await sendMessage(
+        chatId,
+        `📝 <b>CODE REVIEW: ${projectName}</b>\n\n` +
+          `<b>Recommendations:</b>\n${recs || "No issues found!"}`,
+      );
+    } catch (error) {
+      await sendMessage(
+        chatId,
+        `❌ Error: ${error instanceof Error ? error.message : "Unknown"}`,
+      );
+    }
+  },
+
+  optimize: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `⚡ <b>AI Optimize</b>\n\n` +
+          `AI-powered performance optimization suggestions.\n\n` +
+          `<b>Usage:</b> <code>/optimize [project-name]</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+    await sendMessage(
+      chatId,
+      `⚡ Analyzing performance for <code>${projectName}</code>...`,
+    );
+
+    try {
+      const result = await optimizeProject(projectName, "{}", {});
+
+      if (!result.success) {
+        await sendMessage(chatId, `❌ ${result.error}`);
+        return;
+      }
+
+      const recs = result.recommendations.slice(0, 5).join("\n");
+
+      await sendMessage(
+        chatId,
+        `⚡ <b>OPTIMIZATION: ${projectName}</b>\n\n` +
+          `<b>Recommendations:</b>\n${recs || "Project is optimized!"}`,
+      );
+    } catch (error) {
+      await sendMessage(
+        chatId,
+        `❌ Error: ${error instanceof Error ? error.message : "Unknown"}`,
+      );
+    }
+  },
+
+  chat: async (chatId, args) => {
+    if (args.length < 2) {
+      await sendMessage(
+        chatId,
+        `💬 <b>AI Chat</b>\n\n` +
+          `Ask Claude anything about a project.\n\n` +
+          `<b>Usage:</b> <code>/chat [project] [question]</code>\n` +
+          `<b>Example:</b> <code>/chat simmer-down how do I add authentication?</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+    const question = args.slice(1).join(" ");
+
+    const result = await chatAboutProject(projectName, question);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(
+      chatId,
+      `💬 <b>AI Response</b>\n\n${result.response.slice(0, 3500)}`,
+    );
+  },
+
+  // ==================== CLIENT ACQUISITION COMMANDS ====================
+
+  roi: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `💰 <b>ROI Calculator</b>\n\n` +
+          `Calculate ROI for any sector.\n\n` +
+          `<b>Usage:</b> <code>/roi [sector]</code>\n` +
+          `<b>Sectors:</b> hotel, restaurant, nightclub, yacht, villa, spa, tour\n\n` +
+          `<b>Example:</b> <code>/roi hotel</code>`,
+      );
+      return;
+    }
+
+    const sector = args[0].toLowerCase();
+    const roi = calculateROI(sector);
+    await sendMessage(chatId, formatROIForTelegram(roi));
+  },
+
+  pitch: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🎯 <b>Sales Pitch Generator</b>\n\n` +
+          `Generate a compelling sales pitch.\n\n` +
+          `<b>Usage:</b> <code>/pitch [business] [sector]</code>\n` +
+          `<b>Example:</b> <code>/pitch "Casa San Agustin" hotel</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+
+    const fullText = args.join(" ");
+    let businessName: string;
+    let sector: string;
+
+    const quotedMatch = fullText.match(/["']([^"']+)["']\s+(\w+)/);
+    if (quotedMatch) {
+      businessName = quotedMatch[1];
+      sector = quotedMatch[2];
+    } else {
+      sector = args[args.length - 1];
+      businessName = args.slice(0, -1).join(" ");
+    }
+
+    await sendMessage(
+      chatId,
+      `🎯 Generating pitch for <code>${businessName}</code>...`,
+    );
+
+    const result = await generatePitch(businessName, sector);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(chatId, formatPitchForTelegram(result));
+  },
+
+  proposal: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `📋 <b>Proposal Generator</b>\n\n` +
+          `Generate a full client proposal.\n\n` +
+          `<b>Usage:</b> <code>/proposal [business] [sector]</code>\n` +
+          `<b>Example:</b> <code>/proposal "Alquimico" nightclub</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+
+    const fullText = args.join(" ");
+    let businessName: string;
+    let sector: string;
+
+    const quotedMatch = fullText.match(/["']([^"']+)["']\s+(\w+)/);
+    if (quotedMatch) {
+      businessName = quotedMatch[1];
+      sector = quotedMatch[2];
+    } else {
+      sector = args[args.length - 1];
+      businessName = args.slice(0, -1).join(" ");
+    }
+
+    const result = await generateProposal(businessName, sector);
+    await sendMessage(chatId, formatProposalForTelegram(result));
+  },
+
+  competitor: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🔍 <b>Competitor Analysis</b>\n\n` +
+          `Analyze competitors for a business.\n\n` +
+          `<b>Usage:</b> <code>/competitor [business] [sector]</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+
+    const fullText = args.join(" ");
+    let businessName: string;
+    let sector: string;
+
+    const quotedMatch = fullText.match(/["']([^"']+)["']\s+(\w+)/);
+    if (quotedMatch) {
+      businessName = quotedMatch[1];
+      sector = quotedMatch[2];
+    } else {
+      sector = args[args.length - 1];
+      businessName = args.slice(0, -1).join(" ");
+    }
+
+    await sendMessage(
+      chatId,
+      `🔍 Analyzing competitors for <code>${businessName}</code>...`,
+    );
+
+    const result = await analyzeCompetitors(businessName, sector);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    const competitorList = result.competitors
+      .map(
+        (c) =>
+          `<b>${c.name}</b>\n✅ ${c.strengths.join(", ")}\n❌ ${c.weaknesses.join(", ")}`,
+      )
+      .join("\n\n");
+
+    const opportunities = result.opportunities.map((o) => `• ${o}`).join("\n");
+
+    await sendMessage(
+      chatId,
+      `🔍 <b>COMPETITOR ANALYSIS</b>\n\n` +
+        `${competitorList || "No competitors found"}\n\n` +
+        `<b>Opportunities:</b>\n${opportunities}`,
+    );
+  },
+
+  // ==================== ANALYTICS COMMANDS ====================
+
+  speed: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `⚡ <b>Speed Test</b>\n\n` +
+          `Test Core Web Vitals for any URL.\n\n` +
+          `<b>Usage:</b> <code>/speed [url-or-project]</code>\n` +
+          `<b>Example:</b> <code>/speed simmer-down</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    let url = args[0];
+
+    if (!url.startsWith("http")) {
+      url = `https://${url}.vercel.app`;
+    }
+
+    await sendMessage(
+      chatId,
+      `⚡ Running speed test on <code>${url}</code>...`,
+    );
+
+    const result = await runSpeedTest(url);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(chatId, formatSpeedForTelegram(result));
+  },
+
+  seo: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🔍 <b>SEO Audit</b>\n\n` +
+          `Check SEO for any URL.\n\n` +
+          `<b>Usage:</b> <code>/seo [url-or-project]</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    let url = args[0];
+
+    if (!url.startsWith("http")) {
+      url = `https://${url}.vercel.app`;
+    }
+
+    await sendMessage(chatId, `🔍 Running SEO audit on <code>${url}</code>...`);
+
+    const result = await checkSEO(url);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(chatId, formatSEOForTelegram(result));
+  },
+
+  uptime: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `📡 <b>Uptime Check</b>\n\n` +
+          `Check if a site is up.\n\n` +
+          `<b>Usage:</b> <code>/uptime [url-or-project]</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    let url = args[0];
+
+    if (!url.startsWith("http")) {
+      url = `https://${url}.vercel.app`;
+    }
+
+    const result = await checkUptime(url);
+    await sendMessage(chatId, formatUptimeForTelegram(result));
+  },
+
+  // ==================== CONTENT COMMANDS ====================
+
+  copy: async (chatId, args) => {
+    if (args.length < 2) {
+      await sendMessage(
+        chatId,
+        `✍️ <b>Copy Generator</b>\n\n` +
+          `Generate marketing copy.\n\n` +
+          `<b>Usage:</b> <code>/copy [business] [section]</code>\n` +
+          `<b>Sections:</b> hero, cta, about, contact, services\n\n` +
+          `<b>Example:</b> <code>/copy "Casa Hotel" hero</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+
+    const section = args[args.length - 1];
+    const businessName = args.slice(0, -1).join(" ").replace(/["']/g, "");
+
+    const result = await generateCopy(businessName, "hospitality", section);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(chatId, formatCopyForTelegram(result));
+  },
+
+  translate: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🌐 <b>Translator</b>\n\n` +
+          `Translate text between Spanish and English.\n\n` +
+          `<b>Usage:</b> <code>/translate [text]</code>\n` +
+          `<b>Example:</b> <code>/translate Welcome to our hotel</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const text = args.join(" ");
+
+    // Detect language and translate to opposite
+    const isSpanish = /[áéíóúñ¿¡]/i.test(text);
+    const targetLang = isSpanish ? "en" : "es";
+
+    const result = await translateText(text, targetLang as "es" | "en");
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(chatId, formatTranslationForTelegram(result));
+  },
+
+  image: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `🎨 <b>Image Prompt Generator</b>\n\n` +
+          `Generate AI image prompts.\n\n` +
+          `<b>Usage:</b> <code>/image [description]</code>\n` +
+          `<b>Example:</b> <code>/image luxury hotel lobby at sunset</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const description = args.join(" ");
+
+    const result = await generateImagePrompt(description);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(
+      chatId,
+      `🎨 <b>IMAGE PROMPT</b>\n\n` +
+        `<b>Description:</b> ${description}\n\n` +
+        `<b>AI Prompt:</b>\n<pre>${result.prompt}</pre>\n\n` +
+        `💡 Use this prompt with DALL-E, Midjourney, or Stable Diffusion`,
+    );
+  },
+
+  // ==================== ADVANCED DEPLOY COMMANDS ====================
+
+  clone: async (chatId, args) => {
+    if (args.length < 2) {
+      await sendMessage(
+        chatId,
+        `📋 <b>Clone Project</b>\n\n` +
+          `Clone an existing project to a new name.\n\n` +
+          `<b>Usage:</b> <code>/clone [source] [new-name]</code>\n` +
+          `<b>Example:</b> <code>/clone simmer-down my-new-site</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const source = args[0];
+    const newName = args[1];
+
+    await sendMessage(
+      chatId,
+      `📋 Cloning <code>${source}</code> to <code>${newName}</code>...`,
+    );
+
+    const result = await cloneProject(source, newName);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(
+      chatId,
+      `✅ <b>Project Cloned!</b>\n\n` +
+        `📁 Repo: <a href="${result.repoUrl}">${newName}</a>\n\n` +
+        `<b>Next steps:</b>\n` +
+        `1. Clone the repo locally\n` +
+        `2. Copy files from ${source}\n` +
+        `3. Push and deploy\n\n` +
+        `<code>/deploy ${newName}</code> when ready`,
+    );
+  },
+
+  "env-set": async (chatId, args) => {
+    if (args.length < 3) {
+      await sendMessage(
+        chatId,
+        `🔐 <b>Set Environment Variable</b>\n\n` +
+          `Set an env var on a Vercel project.\n\n` +
+          `<b>Usage:</b> <code>/env-set [project] [KEY] [value]</code>\n` +
+          `<b>Example:</b> <code>/env-set mysite API_KEY sk-123</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+    const key = args[1];
+    const value = args.slice(2).join(" ");
+
+    const result = await setEnvVar(projectName, key, value);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(
+      chatId,
+      `✅ <b>Environment Variable Set</b>\n\n` +
+        `📦 Project: <code>${projectName}</code>\n` +
+        `🔑 Key: <code>${key}</code>\n` +
+        `🎯 Targets: production, preview\n\n` +
+        `⚠️ Redeploy to apply: <code>/deploy ${projectName}</code>`,
+    );
+  },
+
+  "domain-add": async (chatId, args) => {
+    if (args.length < 2) {
+      await sendMessage(
+        chatId,
+        `🌐 <b>Add Domain</b>\n\n` +
+          `Add a custom domain to a project.\n\n` +
+          `<b>Usage:</b> <code>/domain-add [project] [domain]</code>\n` +
+          `<b>Example:</b> <code>/domain-add mysite example.com</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+    const domain = args[1];
+
+    const result = await addDomain(projectName, domain);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(
+      chatId,
+      `✅ <b>Domain Added</b>\n\n` +
+        `📦 Project: <code>${projectName}</code>\n` +
+        `🌐 Domain: <code>${domain}</code>\n` +
+        `${result.configured ? "✅ Verified" : "⚠️ DNS configuration required"}\n\n` +
+        `<b>DNS Records:</b>\n` +
+        `A Record: 76.76.21.21\n` +
+        `CNAME: cname.vercel-dns.com`,
+    );
+  },
+
+  preview: async (chatId, args) => {
+    if (args.length === 0) {
+      await sendMessage(
+        chatId,
+        `👁️ <b>Preview Branch</b>\n\n` +
+          `Get preview URL for a branch.\n\n` +
+          `<b>Usage:</b> <code>/preview [project] [branch]</code>\n` +
+          `<b>Example:</b> <code>/preview mysite feature-branch</code>`,
+      );
+      return;
+    }
+
+    await sendTyping(chatId);
+    const projectName = args[0];
+    const branch = args[1] || "main";
+
+    const result = await getPreviewUrl(projectName, branch);
+
+    if (!result.success) {
+      await sendMessage(chatId, `❌ ${result.error}`);
+      return;
+    }
+
+    await sendMessage(
+      chatId,
+      `👁️ <b>Preview URL</b>\n\n` +
+        `📦 Project: <code>${projectName}</code>\n` +
+        `🌿 Branch: <code>${branch}</code>\n` +
+        `🔗 URL: <a href="${result.url}">${result.url}</a>`,
+    );
   },
 };
 
